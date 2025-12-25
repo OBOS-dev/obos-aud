@@ -217,9 +217,7 @@ int main(int argc, char** argv)
                 continue;
             if (fds[i].revents & POLLERR)
             {
-                obos_aud_process_disconnect(obos_aud_get_client_by_fd(fds[i].fd));
-                close(fds[i].fd);
-                shutdown(fds[i].fd, SHUT_RDWR);
+                obos_aud_process_disconnect(obos_aud_get_client_by_fd(fds[i].fd), NULL);
                 if (i != (nToPoll - 1))
                     fds[i].fd = -fds[i].fd;
                 else
@@ -265,6 +263,15 @@ int main(int argc, char** argv)
                 con = obos_aud_get_client(curr->fd, curr->pckt.client_id);
                 if (!con)
                 {
+                    aud_packet resp = {};
+                    resp.opcode = OBOS_AUD_STATUS_REPLY_DISCONNECTED;
+                    resp.client_id = curr->pckt.client_id;
+                    resp.payload = "Client never seen";
+                    resp.payload_len = 18;
+                    resp.transmission_id = curr->pckt.transmission_id;
+                    resp.transmission_id_valid = true;
+                    autrans_transmit(curr->fd, &resp);
+
                     // Invalid connection
                     shutdown(curr->fd, SHUT_RDWR);
                     close(curr->fd);
@@ -288,7 +295,7 @@ int main(int argc, char** argv)
                     ok_status.client_id = con->client_id;
                     ok_status.transmission_id = curr->pckt.transmission_id;
                     autrans_transmit(curr->fd, &ok_status);
-                    obos_aud_process_disconnect(con);
+                    obos_aud_process_disconnect(con, &curr->pckt);
                     if (curr->poll_fd_idx != (nToPoll - 1))
                         fds[curr->poll_fd_idx].fd = -fds[curr->poll_fd_idx].fd;
                     else
@@ -307,7 +314,7 @@ int main(int argc, char** argv)
                 default:
                 {
                     if (con)
-                        obos_aud_process_disconnect(con);
+                        obos_aud_process_disconnect(con, &curr->pckt);
                     else
                     {
                         shutdown(curr->fd, SHUT_RDWR);

@@ -36,4 +36,4 @@ extern struct obos_aud_connection_array {
 obos_aud_connection* obos_aud_get_client(int fd, uint32_t client_id);
 obos_aud_connection* obos_aud_get_client_by_fd(int fd);
 obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt);
-void obos_aud_process_disconnect(obos_aud_connection* client);
+void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt);

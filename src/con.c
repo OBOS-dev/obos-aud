@@ -84,8 +84,17 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
     return ret;
 }
 
-void obos_aud_process_disconnect(obos_aud_connection* client)
+void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt)
 {
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_STATUS_REPLY_DISCONNECTED;
+    resp.client_id = client->client_id;
+    resp.payload = "Gracefully disconnected";
+    resp.payload_len = 24;
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id_valid = !!pckt;
+    autrans_transmit(client->fd, &resp);
+
     shutdown(client->fd, SHUT_RDWR);
     close(client->fd);
     pthread_mutex_lock(&g_connections.lock);
