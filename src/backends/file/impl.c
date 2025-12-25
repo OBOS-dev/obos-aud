@@ -77,9 +77,7 @@ int aud_backend_initialize()
 // Returns the amount of outputs, or -1 on error
 int aud_backend_get_outputs(aud_output_dev* arr, int count)
 {
-    if (!count)
-        return OUTPUT_COUNT;
-    memcpy(arr, s_backend_outputs, MIN(count, OUTPUT_COUNT));
+    memcpy(arr, s_backend_outputs, MIN(count, OUTPUT_COUNT)*sizeof(*arr));
     return OUTPUT_COUNT;
 }
 

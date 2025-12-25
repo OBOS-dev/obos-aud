@@ -9,7 +9,7 @@
 #include <obos-aud/trans.h>
 
 #include <obos-aud/priv/con.h>
-#include <obos-aud/priv/backend.h>
+#include <obos-aud/priv/mixer.h>
 
 #include <strings.h>
 #include <unistd.h>
@@ -124,12 +124,7 @@ int main(int argc, char** argv)
         }
     }
 
-    int err = aud_backend_initialize();
-    if (err != 0)
-    {
-        fprintf(stderr, "aud_backend_initialize returned %d\n", err);
-        return -1;
-    }
+    mixer_initialize();
 
     struct pollfd *fds = calloc(3, sizeof(struct pollfd));
     size_t nToPoll = 0;
