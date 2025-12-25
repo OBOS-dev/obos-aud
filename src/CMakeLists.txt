@@ -2,9 +2,11 @@
 
 # Copyright (c) 2025 Omar Berrow
 
+add_subdirectory(backends/${BACKEND})
+
 set(SERVER_SOURCES "server_main.c" "con.c")
 
-add_executable(obos-aud ${SERVER_SOURCES})
+add_executable(obos-aud ${SERVER_SOURCES} $<TARGET_OBJECTS:backend_obj>)
 
 target_link_libraries(obos-aud PRIVATE autrans_so m)
 

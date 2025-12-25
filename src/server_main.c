@@ -7,7 +7,9 @@
 #define _GNU_SOURCE 1
 
 #include <obos-aud/trans.h>
+
 #include <obos-aud/priv/con.h>
+#include <obos-aud/priv/backend.h>
 
 #include <strings.h>
 #include <unistd.h>
@@ -57,6 +59,12 @@ static void remove_unix_socket(int status, void* filename)
 
 int main(int argc, char** argv)
 {
+    if (!aud_backend_initialize || !aud_backend_get_outputs)
+    {
+        fprintf(stderr, "No backend compiled!\n");
+        return -1;
+    }
+
     int opt = 0;
 
     const char* bind_address = "0.0.0.0";
