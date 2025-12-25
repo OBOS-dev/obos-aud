@@ -16,15 +16,15 @@
 #include <obos-aud/compiler.h>
 #include <obos-aud/output.h>
 
-// Returns -1 on error, >0 on success
+#include <stdbool.h>
+
+/* Returns -1 on error, >0 on success */
 WEAK int aud_backend_initialize();
-// Returns the amount of outputs, or -1 on error
+/* Returns the amount of outputs, or -1 on error */
 WEAK int aud_backend_get_outputs(aud_output_dev* arr, int count);
-// All streams are PCM
-// It is illegal to call this if there are open windows
-// on the output
+/* All streams are PCM */
 WEAK int aud_backend_configure_output(int output_id, int sample_rate, int channels, int format_size);
-// The memory at *window is assumed to be sample_rate*channels*format_size_bytes in length.
-WEAK int aud_backend_open_output_window(int output_id, void** window, void** window_info);
-WEAK int aud_backend_close_output_window(int output_id, void* window, void* window_info);
-WEAK int aud_backend_set_master_volume(int output_id, float volume /* out of 100 */);
+/* The memory at buf is assumed to be sample_rate*channels*format_size_bytes in length. */
+WEAK int aud_backend_queue_data(int output_id, const void* buf);
+WEAK int aud_backend_output_play(int output_id, bool play);
+WEAK int aud_backend_set_output_volume(int output_id, float volume /* out of 100 */);
