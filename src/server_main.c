@@ -27,7 +27,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 
-static const char* const usage = "%s [-l connection_mode] [-n connection_mode] [-a address]\n'connection_mode' can be either tcp or unix.\n";
+static const char* const usage = "%s [-l connection_mode] [-n connection_mode] [-a address] [-m unix_socket_mode]\n'connection_mode' can be either tcp or unix.\n";
 
 struct packet_node {
     aud_packet pckt;
@@ -58,13 +58,13 @@ static void remove_unix_socket(int status, void* filename)
 int main(int argc, char** argv)
 {
     int opt = 0;
-    long final_log_level = 2;
 
     const char* bind_address = "0.0.0.0";
     bool tcp_listen = true;
     bool unix_listen = true;
+    int unix_socket_mode = 0777;
 
-    while ((opt = getopt(argc, argv, "hl:n:a")) != -1)
+    while ((opt = getopt(argc, argv, "hl:n:m:a")) != -1)
     {
         switch (opt)
         {
@@ -97,6 +97,18 @@ int main(int argc, char** argv)
                 }
                 break;
             }
+            case 'm':
+            {
+                errno = 0;
+                unix_socket_mode = strtol(optarg, NULL, 8);
+                if (errno != 0)
+                {
+                    fputs("Invalid mode!\n", stderr);
+                    fprintf(stderr, usage, argv[0]);
+                    return -1;
+                }
+                break;
+            }
             case 'h':
             default:
                 fprintf(stderr, usage, argv[0]);
@@ -114,8 +126,6 @@ int main(int argc, char** argv)
         return -1;
     }
     struct sockaddr_un unix_addr = {.sun_family=AF_UNIX};
-    mkdir("/tmp", 777);
-    mkdir("/tmp/.obos-aud", 777);
     memcpy(unix_addr.sun_path, "/tmp/.obos-aud/U0", 18);
     int tcp_fd = -1;
     int unix_fd = -1;
@@ -148,6 +158,8 @@ int main(int argc, char** argv)
     do if (unix_listen)
     {
         struct pollfd* fd = &fds[nToPoll++];
+        mode_t old_mask = umask(0);
+        mkdir("/tmp/.obos-aud", unix_socket_mode);
         unix_fd = fd->fd = socket(AF_UNIX, SOCK_STREAM, IPPROTO_IP);
         if (fd->fd == -1)
         {
@@ -167,6 +179,8 @@ int main(int argc, char** argv)
             nToPoll--;
             break;
         }
+        chmod(unix_addr.sun_path, unix_socket_mode);
+        umask(old_mask);
         fd->events |= POLLIN;
     } while(0);
 
@@ -179,6 +193,7 @@ int main(int argc, char** argv)
     if (unix_listen)
         on_exit(remove_unix_socket, unix_addr.sun_path);
     signal(SIGINT, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
     signal(SIGQUIT, quit);
 
     int empty_pipes[2] = {};
