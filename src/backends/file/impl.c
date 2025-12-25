@@ -64,11 +64,19 @@ static void* process_audio(void* arg)
     return NULL;
 }
 
+#define FIFO_NAME "obos-aud-output"
+
+static void delete_fifo(int, void*)
+{
+    unlink(FIFO_NAME);
+}
+
 int aud_backend_initialize()
 {
-    s_backend_file_output = mkfifo("obos-aud-output", 777);
+    s_backend_file_output = mkfifo(FIFO_NAME, 777);
     if (s_backend_file_output < 0)
         return s_backend_file_output;
+    on_exit(delete_fifo, NULL);
     pthread_create(&s_backend_thread, NULL, process_audio, NULL);
     aud_backend_output_play(1, false);
     return 0;
@@ -85,7 +93,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
 {
     if (output_id != 1)
         return -1;
-    if (format_size % 8 || !s_sample_rate || !channels)
+    if ((format_size % 8) != 0 || !sample_rate || !channels)
         return -1;
     s_sample_rate = sample_rate;
     s_channels = channels;
