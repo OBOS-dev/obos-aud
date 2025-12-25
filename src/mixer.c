@@ -136,3 +136,12 @@ aud_stream_node* mixer_output_add_stream(int output_id, aud_stream* stream)
 }
 
 void mixer_output_remove_stream(int output_id, aud_stream_node* stream);
+
+void mixer_output_set_default(int output_id)
+{
+    mixer_output_device* dev = mixer_output_from_id(output_id);
+    if (!dev)
+        return;
+    dev->info.flags |= OBOS_AUD_OUTPUT_FLAGS_DEFAULT;
+    g_default_output = dev;
+}
