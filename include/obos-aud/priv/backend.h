@@ -21,4 +21,9 @@ WEAK int aud_backend_initialize();
 // Returns the amount of outputs, or -1 on error
 WEAK int aud_backend_get_outputs(aud_output_dev* arr, int count);
 // All streams are PCM
+// It is illegal to call this if there are open windows
+// on the output
 WEAK int aud_backend_configure_output(int output_id, int sample_rate, int channels, int format_size);
+// The memory at *window is assumed to be sample_rate*channels*format_size_bytes in length.
+WEAK int aud_backend_open_output_window(int output_id, void** window, void** window_info);
+WEAK int aud_backend_close_output_window(int output_id, void* window, void* window_info);
