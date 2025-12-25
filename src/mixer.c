@@ -159,6 +159,7 @@ void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* s
         dev->streams.tail = stream->prev;
     dev->streams.nNodes--;
     pthread_mutex_unlock(&dev->streams.lock);
+    free(stream);
 }
 
 aud_stream_node* mixer_output_add_stream(int output_id)

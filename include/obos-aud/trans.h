@@ -26,6 +26,7 @@ enum aud_opcode {
     OBOS_AUD_NOP,
     OBOS_AUD_DISCONNECT_REQUEST,
     OBOS_AUD_OPEN_STREAM,
+    OBOS_AUD_CLOSE_STREAM,
     OBOS_AUD_DATA,
     OBOS_AUD_QUERY_OUTPUT_DEVICE,
 
@@ -87,6 +88,10 @@ typedef struct aud_open_stream_payload {
     uint16_t target_sample_rate;
     uint8_t input_channels;
 } PACK aud_open_stream_payload;
+
+typedef struct aud_close_stream_payload {
+    uint16_t stream_id;
+} PACK aud_close_stream_payload;
 
 typedef struct aud_query_output_device_payload {
     uint16_t output_id;

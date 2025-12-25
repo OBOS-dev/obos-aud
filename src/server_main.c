@@ -318,11 +318,13 @@ int main(int argc, char** argv)
                     break;
 
                 case OBOS_AUD_OPEN_STREAM:
-                case OBOS_AUD_DATA:
+                    obos_aud_process_stream_open(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_CLOSE_STREAM:
+                    obos_aud_process_stream_close(con, &curr->pckt);
+                    break;
                 case OBOS_AUD_QUERY_OUTPUT_DEVICE:
-                    unsupported_status.client_id = con->client_id;
-                    unsupported_status.transmission_id = curr->pckt.transmission_id;
-                    autrans_transmit(curr->fd, &unsupported_status);
+                    obos_aud_process_output_device_query(con, &curr->pckt);
                     break;
 
                 case OBOS_AUD_STATUS_REPLY_OK:
