@@ -27,3 +27,4 @@ WEAK int aud_backend_configure_output(int output_id, int sample_rate, int channe
 // The memory at *window is assumed to be sample_rate*channels*format_size_bytes in length.
 WEAK int aud_backend_open_output_window(int output_id, void** window, void** window_info);
 WEAK int aud_backend_close_output_window(int output_id, void* window, void* window_info);
+WEAK int aud_backend_set_master_volume(int output_id, float volume /* out of 100 */);
