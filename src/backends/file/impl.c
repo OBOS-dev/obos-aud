@@ -85,3 +85,11 @@ int aud_backend_close_output_window(int output_id, void* window, void* window_in
     s_open_window_count--;
     return 0;
 }
+
+// Does nothing.
+int aud_backend_set_master_volume(int output_id, float volume)
+{
+    if (volume < 0 || volume > 100 || output_id != 1)
+        return -1;
+    return 0;
+}
