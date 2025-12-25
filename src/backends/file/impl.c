@@ -27,6 +27,9 @@ static aud_output_dev s_backend_outputs[OUTPUT_COUNT] = {
         .output_id = 1,
     }
 };
+static int s_sample_rate = 0;
+static int s_channels = 0;
+static int s_format_size = 0;
 
 int aud_backend_initialize()
 {
@@ -43,4 +46,18 @@ int aud_backend_get_outputs(aud_output_dev* arr, int count)
         return OUTPUT_COUNT;
     memcpy(arr, s_backend_outputs, MIN(count, OUTPUT_COUNT));
     return OUTPUT_COUNT;
+}
+
+int aud_backend_configure_output(int output_id, int sample_rate, int channels, int format_size)
+{
+    if (output_id != 1)
+        return -1;
+    if (format_size % 8)
+        return -1;
+    s_sample_rate = sample_rate;
+    s_channels = channels;
+    s_format_size = format_size;
+    ftruncate(s_backend_file_output, 0);
+    posix_fallocate(s_backend_file_output, 0, s_sample_rate*s_channels*(s_format_size/8));
+    return 0;
 }
