@@ -14,9 +14,11 @@
 
 #include <obos-aud/stream.h>
 
-void aud_stream_initialize(aud_stream* stream)
+void aud_stream_initialize(aud_stream* stream, int sample_rate, int channels)
 {
     stream->mut = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    stream->sample_rate = sample_rate;
+    stream->channels = channels;
 }
 
 void aud_stream_push(aud_stream* stream, const void* data, size_t len)

@@ -15,10 +15,12 @@
 typedef struct aud_stream {
     void* buffer;
     size_t ptr;
-    pthread_mutex_t mut;   
+    pthread_mutex_t mut;
+    int sample_rate;
+    int channels;
 } aud_stream;
 
-void aud_stream_initialize(aud_stream* stream);
+void aud_stream_initialize(aud_stream* stream, int sample_rate, int channels);
 void aud_stream_push(aud_stream* stream, const void* data, size_t len);
 void aud_stream_read(aud_stream* stream, void* data, size_t len);
 /* does not lock the stream */
