@@ -212,9 +212,6 @@ int main(int argc, char** argv)
     signal(SIGQUIT, quit);
     signal(SIGTERM, quit);
 
-    int empty_pipes[2] = {};
-    pipe(empty_pipes);
-
     aud_packet ok_status = {
         .opcode = OBOS_AUD_STATUS_REPLY_OK,
         .client_id = 0,
