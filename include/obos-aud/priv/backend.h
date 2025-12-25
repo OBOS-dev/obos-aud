@@ -20,3 +20,5 @@
 WEAK int aud_backend_initialize();
 // Returns the amount of outputs, or -1 on error
 WEAK int aud_backend_get_outputs(aud_output_dev* arr, int count);
+// All streams are PCM
+WEAK int aud_backend_configure_output(int output_id, int sample_rate, int channels, int format_size);
