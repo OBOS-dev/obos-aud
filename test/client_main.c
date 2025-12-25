@@ -226,7 +226,21 @@ int main(int argc, char** argv)
 
         if (autrans_receive(socket, &reply, NULL, 0) < 0)
             break;
+        if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+            continue;
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While writing to stream: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While writing to stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        
     }
+    if (avail < 0)
+        perror("read");
 
     die:
     autrans_disconnect(socket, client_id);
