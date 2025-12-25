@@ -1,0 +1,126 @@
+/*
+ * obos-aud/trans.h
+ *
+ * This file is a part of the obos-aud project.
+ *
+ * Copyright (c) 2025 Omar Berrow
+ * SPDX License Identifier: MIT
+ */
+
+#pragma once
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
+#include <obos-aud/compiler.h>
+#include <obos-aud/output.h>
+
+#include <sys/socket.h>
+
+enum aud_opcode {
+    OBOS_AUD_REQUEST_BEGIN = 0x0000,
+    OBOS_AUD_INITIAL_CONNECTION_REQUEST,
+    OBOS_AUD_NOP,
+    OBOS_AUD_DISCONNECT_REQUEST,
+    OBOS_AUD_OPEN_STREAM,
+    OBOS_AUD_DATA,
+    OBOS_AUD_QUERY_OUTPUT_DEVICE,
+
+    OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
+    OBOS_AUD_INITIAL_CONNECTION_REPLY,
+    OBOS_AUD_OPEN_STREAM_REPLY,
+
+    /*
+     * All status replies have no required payload,
+     * as the opcode is the payload itself.
+     * In the case that a status reply does have a
+     * payload, it is extra info on the error.
+     */
+    OBOS_AUD_STATUS_REPLY_OK = 0x2000,
+    OBOS_AUD_STATUS_REPLY_UNSUPPORTED,
+    OBOS_AUD_STATUS_REPLY_INVAL,
+    OBOS_AUD_STATUS_REPLY_DISCONNECTED,
+};
+
+#define OBOS_AUD_HEADER_MAGIC (0x0b05a7d1 /* obosaudi */)
+typedef struct aud_header {
+    uint32_t magic;
+    uint32_t data_offset;
+    uint32_t size; // includes sizeof(aud_header)
+    uint32_t opcode;
+    uint32_t trans_id;
+    uint32_t client_id;
+    char payload[];
+} PACK aud_header;
+
+/* CONSTANT!!! */
+#define OBOS_AUD_BASE_PROTOCOL_HEADER_SIZE (24)
+
+/**************************************************/
+/* Reply structures */
+
+typedef struct aud_initial_connection_reply {
+    uint32_t client_id;
+    uint16_t output_ids[];
+} PACK aud_initial_connection_reply;
+
+typedef struct aud_open_stream_reply {
+    uint16_t stream_id;
+} PACK aud_open_stream_reply;
+
+typedef struct aud_query_output_device_reply {
+    aud_output_dev info;
+} PACK aud_query_output_device_reply;
+
+/* Payload structures */
+/**************************************************/
+
+/* PROTOCOL NOTE: Stream format is locked to PCM16 until further notice */
+
+typedef struct aud_open_stream_payload {
+    uint16_t output_id;
+    uint16_t target_sample_rate;
+    uint8_t input_channels;
+} PACK aud_open_stream_payload;
+
+typedef struct aud_query_output_device_payload {
+    uint16_t output_id;
+} PACK aud_query_output_device_payload;
+
+typedef struct aud_data_payload {
+    uint16_t stream_id;
+    char data[];
+} PACK aud_data_payload;
+
+/***************************************************/
+
+/*
+ * This struct is for library purposes, 
+ * it does not exist on the network.
+ */
+
+typedef struct aud_packet
+{
+    uint32_t opcode;
+    
+    /* If replying to a packet, set this to the
+     * transmission id of the received packet,
+     * otherwise this field can be disregarded */
+    uint32_t transmission_id;
+    bool transmission_id_valid;
+    
+    uint32_t client_id;
+
+    void* payload;
+    uint32_t payload_len;
+} aud_packet;
+
+/* All functions return -1 on error, and >0 on success */
+
+int autrans_transmit(int fd, const aud_packet* pckt);
+int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len);
+int autrans_initial_connection_request(int fd);
+
+#define OBOS_AUD_TCP_PORT 44630
+#define OBOS_AUD_UDP_PORT 44630
