@@ -123,4 +123,3 @@ int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockadd
 int autrans_initial_connection_request(int fd);
 
 #define OBOS_AUD_TCP_PORT 44630
-#define OBOS_AUD_UDP_PORT 44630
