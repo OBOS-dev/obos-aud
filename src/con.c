@@ -80,12 +80,14 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
     resp.transmission_id = pckt->transmission_id;
     resp.transmission_id_valid = true;
     autrans_transmit(fd, &resp);
+    free(payload);
 
     return ret;
 }
 
 void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt)
 {
+    if (!client) return;
     aud_packet resp = {};
     resp.opcode = OBOS_AUD_STATUS_REPLY_DISCONNECTED;
     resp.client_id = client->client_id;

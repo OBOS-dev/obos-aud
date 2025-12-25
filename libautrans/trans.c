@@ -4,7 +4,8 @@
  * Copyright (c) 2025 Omar Berrow
  */
 
- #include <bits/sockaddr.h>
+ #include <asm-generic/errno.h>
+#include <bits/sockaddr.h>
 #define _GNU_SOURCE 1
  
 #include <ctype.h>
@@ -29,7 +30,7 @@ static uint32_t next_trans_id()
     return ++iter;
 }
 
-int autrans_transmit(int fd, const aud_packet* pckt)
+int autrans_transmit(int fd, aud_packet* pckt)
 {
     if (!pckt || fd <= 0)
     {
@@ -51,6 +52,7 @@ int autrans_transmit(int fd, const aud_packet* pckt)
         hdr->trans_id = pckt->transmission_id;
     else
         hdr->trans_id = aud_hton32(next_trans_id());
+    pckt->transmission_id = hdr->trans_id;
     hdr->client_id = pckt->client_id;
 
     if (pckt->payload_len)
@@ -75,6 +77,11 @@ int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockadd
     err = TEMP_FAILURE_RETRY(recvfrom(fd, &hdr, sizeof(hdr.magic)+sizeof(hdr.data_offset), MSG_WAITALL, sockaddr, sockaddr_len));
     if (err < 0)
         return err;
+    if (err == 0)
+    {
+        errno = ECONNRESET;
+        return -1;
+    }
     hdr.magic = aud_ntoh32(hdr.magic);
     if (hdr.magic != OBOS_AUD_HEADER_MAGIC)
     {
@@ -96,15 +103,20 @@ int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockadd
     err = TEMP_FAILURE_RETRY(recv(fd, ((char*)&hdr)+offset, OBOS_AUD_BASE_PROTOCOL_HEADER_SIZE-offset, MSG_WAITALL));
     if (err < 0)
         return err;
+    if (err == 0)
+    {
+        errno = ECONNRESET;
+        return -1;
+    }
     hdr.size = aud_ntoh32(hdr.size);
     hdr.opcode = aud_ntoh32(hdr.opcode);
     pckt->transmission_id = hdr.trans_id;
     pckt->transmission_id_valid = true;
     pckt->client_id = hdr.client_id;
+    pckt->opcode = hdr.opcode;
 
     if (!(hdr.size - hdr.data_offset))
     {
-        pckt->opcode = hdr.opcode;
         pckt->payload = NULL;
         pckt->payload_len = 0;
         return 0;
@@ -123,10 +135,23 @@ int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockadd
         err = TEMP_FAILURE_RETRY(recv(fd, sink, hdr.data_offset - sizeof(hdr), MSG_WAITALL));
         if (err < 0)
             return err;
+        if (err == 0)
+        {
+            errno = ECONNRESET;
+            return -1;
+        }
         free(sink);
     }
 
-    return TEMP_FAILURE_RETRY(recv(fd, pckt->payload, pckt->payload_len, MSG_WAITALL));
+    err = TEMP_FAILURE_RETRY(recv(fd, pckt->payload, pckt->payload_len, MSG_WAITALL));
+    if (err < 0)
+        return err;
+    if (err == 0)
+    {
+        errno = ECONNRESET;
+        return -1;
+    }
+    return 0;
 }
 
 int autrans_initial_connection_request(int fd)
@@ -134,10 +159,23 @@ int autrans_initial_connection_request(int fd)
     aud_packet pckt = {.opcode=OBOS_AUD_INITIAL_CONNECTION_REQUEST};
     return autrans_transmit(fd, &pckt);
 }
-int autrans_disconnect(int fd)
+int autrans_disconnect(int fd, uint32_t client_id)
 {
-    aud_packet pckt = {.opcode=OBOS_AUD_DISCONNECT_REQUEST};
+    aud_packet pckt = {.opcode=OBOS_AUD_DISCONNECT_REQUEST,.client_id=client_id};
     return autrans_transmit(fd, &pckt);
+}
+int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id)
+{
+    aud_query_output_device_payload payload = {.output_id=output_id};
+    aud_packet pckt = {
+        .opcode = OBOS_AUD_QUERY_OUTPUT_DEVICE,
+        .client_id = client_id,
+        .payload = &payload,
+        .payload_len = sizeof(payload),
+    };
+    int ret = autrans_transmit(fd, &pckt);
+    *transmission_id = pckt.transmission_id;
+    return ret;
 }
 
 int autrans_open()
@@ -273,6 +311,9 @@ int autrans_open_uri(const char* addr)
         perror("autrans_open_addr");
         fprintf(stderr, "Could not open display %s\n", initial_addr);
     }
+    free(saddr);
+    if (free_path)
+        free((char*)path);
 
     return res;
 }
@@ -288,4 +329,24 @@ int autrans_open_addr(struct sockaddr* addr, socklen_t addr_len)
         return res;
     }
     return sock;
+}
+
+const char* autrans_opcode_to_string(uint32_t opcode)
+{
+    switch (opcode) {
+        case OBOS_AUD_INITIAL_CONNECTION_REQUEST: return "OBOS_AUD_INITIAL_CONNECTION_REQUEST";
+        case OBOS_AUD_NOP: return "OBOS_AUD_NOP";
+        case OBOS_AUD_DISCONNECT_REQUEST: return "OBOS_AUD_DISCONNECT_REQUEST";
+        case OBOS_AUD_OPEN_STREAM: return "OBOS_AUD_OPEN_STREAM";
+        case OBOS_AUD_DATA: return "OBOS_AUD_DATA";
+        case OBOS_AUD_QUERY_OUTPUT_DEVICE: return "OBOS_AUD_QUERY_OUTPUT_DEVICE";
+        case OBOS_AUD_INITIAL_CONNECTION_REPLY: return "OBOS_AUD_INITIAL_CONNECTION_REPLY";
+        case OBOS_AUD_OPEN_STREAM_REPLY: return "OBOS_AUD_OPEN_STREAM_REPLY";
+        case OBOS_AUD_STATUS_REPLY_OK: return "OBOS_AUD_STATUS_REPLY_OK";
+        case OBOS_AUD_STATUS_REPLY_UNSUPPORTED: return "OBOS_AUD_STATUS_REPLY_UNSUPPORTED";
+        case OBOS_AUD_STATUS_REPLY_INVAL: return "OBOS_AUD_STATUS_REPLY_INVAL";
+        case OBOS_AUD_STATUS_REPLY_DISCONNECTED: return "OBOS_AUD_STATUS_REPLY_DISCONNECTED";
+        default: break;
+    }
+    return "OBOS_AUD_INVALID_OPCODE";
 }

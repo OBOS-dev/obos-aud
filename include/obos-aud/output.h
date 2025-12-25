@@ -23,6 +23,16 @@ enum aud_output_type {
     OBOS_AUD_OUTPUT_TYPE_UNKNOWN,
 };
 
+static const char* aud_output_type_to_str[] = {
+	"line out",
+	"speaker",
+	"headphone",
+	"CD",
+	"S/PDIF out",
+	"other",
+	"unknown",
+};
+
 enum aud_output_color {
 	OBOS_AUD_OUTPUT_COLOR_UNKNOWN = 0,
 	OBOS_AUD_OUTPUT_COLOR_BLACK = 1,
@@ -57,6 +67,9 @@ enum aud_output_location {
 	OBOS_AUD_OUTPUT_LOCATION_UNKNOWN
 };
 
+enum aud_flags {
+	OBOS_AUD_OUTPUT_FLAGS_DEFAULT = (1<<0),
+};
 
 /* All fields are in little-endian unless otherwise specified. */
 
@@ -64,7 +77,8 @@ typedef struct aud_output_dev {
     uint8_t type;
     uint8_t color;
     uint8_t location;
-    uint8_t pad[3];
+    uint8_t pad[2];
+	uint8_t flags;
     uint16_t output_id;
 } PACK aud_output_dev;
 

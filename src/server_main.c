@@ -195,6 +195,7 @@ int main(int argc, char** argv)
     signal(SIGINT, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGQUIT, quit);
+    signal(SIGTERM, quit);
 
     int empty_pipes[2] = {};
     pipe(empty_pipes);
@@ -230,7 +231,7 @@ int main(int argc, char** argv)
         {
             if (!fds[i].revents)
                 continue;
-            if (fds[i].revents & POLLERR)
+            if (fds[i].revents & POLLERR || fds[i].revents & POLLNVAL)
             {
                 obos_aud_process_disconnect(obos_aud_get_client_by_fd(fds[i].fd), NULL);
                 if (i != (nToPoll - 1))
@@ -252,6 +253,7 @@ int main(int argc, char** argv)
                     }
                     nToPoll++;
                     fds = realloc(fds, nToPoll*sizeof(*fds));
+                    memset(&fds[nToPoll-1], 0, sizeof(fds[nToPoll-1]));
                     fds[nToPoll-1].fd = new_fd;
                     fds[nToPoll-1].events = POLLIN;
                 }
@@ -307,9 +309,6 @@ int main(int argc, char** argv)
                     break;
 
                 case OBOS_AUD_DISCONNECT_REQUEST:
-                    ok_status.client_id = con->client_id;
-                    ok_status.transmission_id = curr->pckt.transmission_id;
-                    autrans_transmit(curr->fd, &ok_status);
                     obos_aud_process_disconnect(con, &curr->pckt);
                     if (curr->poll_fd_idx != (nToPoll - 1))
                         fds[curr->poll_fd_idx].fd = -fds[curr->poll_fd_idx].fd;
@@ -325,23 +324,22 @@ int main(int argc, char** argv)
                     autrans_transmit(curr->fd, &unsupported_status);
                     break;
 
+                case OBOS_AUD_STATUS_REPLY_OK:
+                case OBOS_AUD_STATUS_REPLY_UNSUPPORTED:
+                case OBOS_AUD_STATUS_REPLY_INVAL:
+                case OBOS_AUD_STATUS_REPLY_DISCONNECTED:
+                    break;
+
                 // Invalid opcode
                 default:
                 {
-                    if (con)
-                        obos_aud_process_disconnect(con, &curr->pckt);
-                    else
-                    {
-                        shutdown(curr->fd, SHUT_RDWR);
-                        close(curr->fd);
-                    }
-                    if (curr->poll_fd_idx != (nToPoll - 1))
-                        fds[curr->poll_fd_idx].fd = -fds[curr->poll_fd_idx].fd;
-                    else
-                        fds = realloc(fds, --nToPoll * sizeof(*fds));
+                    unsupported_status.client_id = con->client_id;
+                    unsupported_status.transmission_id = curr->pckt.transmission_id;
+                    autrans_transmit(curr->fd, &unsupported_status);
                     break;
                 }
             }
+            free(curr->pckt.payload);
             free(curr);
         }
     }

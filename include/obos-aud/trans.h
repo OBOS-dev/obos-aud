@@ -18,6 +18,8 @@
 
 #include <sys/socket.h>
 
+/* PROTOCOL NOTE: Audio is to start playing on a stream after the first DATA packet is sent. */
+
 enum aud_opcode {
     OBOS_AUD_REQUEST_BEGIN = 0x0000,
     OBOS_AUD_INITIAL_CONNECTION_REQUEST,
@@ -30,6 +32,7 @@ enum aud_opcode {
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
     OBOS_AUD_OPEN_STREAM_REPLY,
+    OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY,
 
     /*
      * All status replies have no required payload,
@@ -41,6 +44,7 @@ enum aud_opcode {
     OBOS_AUD_STATUS_REPLY_UNSUPPORTED,
     OBOS_AUD_STATUS_REPLY_INVAL,
     OBOS_AUD_STATUS_REPLY_DISCONNECTED,
+    OBOS_AUD_STATUS_REPLY_CEILING = 0x2fff,
 };
 
 #define OBOS_AUD_HEADER_MAGIC (0x0b05a7d1 /* obosaudi */)
@@ -118,10 +122,11 @@ typedef struct aud_packet
 
 /* All functions return -1 on error, and >0 on success */
 
-int autrans_transmit(int fd, const aud_packet* pckt);
+int autrans_transmit(int fd, aud_packet* pckt);
 int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len);
 int autrans_initial_connection_request(int fd);
-int autrans_disconnect(int fd);
+int autrans_disconnect(int fd, uint32_t client_id);
+int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id);
 
 int autrans_open();
 /*
@@ -131,5 +136,7 @@ int autrans_open();
  */
 int autrans_open_uri(const char* addr);
 int autrans_open_addr(struct sockaddr* addr, socklen_t addr_len);
+
+const char* autrans_opcode_to_string(uint32_t opcode);
 
 #define OBOS_AUD_TCP_PORT 44630
