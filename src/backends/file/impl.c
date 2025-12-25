@@ -70,6 +70,7 @@ int aud_backend_initialize()
     if (s_backend_file_output < 0)
         return s_backend_file_output;
     pthread_create(&s_backend_thread, NULL, process_audio, NULL);
+    aud_backend_output_play(1, false);
     return 0;
 }
 
@@ -92,6 +93,18 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     s_channels = channels;
     s_format_size = format_size;
     fcntl(s_backend_file_output, F_SETPIPE_SZ, s_sample_rate*s_channels*(s_format_size/8));
+    return 0;
+}
+
+int aud_backend_query_output_params(int output_id, int *sample_rate, int *channels, int *format_size)
+{
+    if (output_id != 1)
+        return -1;
+    if (!s_sample_rate)
+        return -1;
+    *sample_rate = s_sample_rate;
+    *channels = s_channels;
+    *format_size = s_format_size;
     return 0;
 }
 
