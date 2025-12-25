@@ -127,15 +127,49 @@ mixer_output_device* mixer_output_from_id(int output_id)
     return NULL;
 }
 
-aud_stream_node* mixer_output_add_stream(int output_id, aud_stream* stream)
+aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev)
 {
-    mixer_output_device* dev = mixer_output_from_id(output_id);
     if (!dev)
         return NULL;
-    return NULL;
+    aud_stream_node* node = calloc(1, sizeof(*node));
+    pthread_mutex_lock(&dev->streams.lock);
+    if (!dev->streams.head)
+        dev->streams.head = node;
+    if (dev->streams.tail)
+        dev->streams.tail->next = node;
+    node->prev = dev->streams.tail;
+    dev->streams.tail = node;
+    dev->streams.nNodes++;
+    pthread_mutex_unlock(&dev->streams.lock);
+    return node;
 }
 
-void mixer_output_remove_stream(int output_id, aud_stream_node* stream);
+void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* stream)
+{
+    if (!dev)
+        return;
+    pthread_mutex_lock(&dev->streams.lock);
+    if (stream->next)
+        stream->next->prev = stream->prev;
+    if (stream->prev)
+        stream->prev->next = stream->next;
+    if (dev->streams.head == stream)
+        dev->streams.head = stream->next;
+    if (dev->streams.tail == stream)
+        dev->streams.tail = stream->prev;
+    dev->streams.nNodes--;
+    pthread_mutex_unlock(&dev->streams.lock);
+}
+
+aud_stream_node* mixer_output_add_stream(int output_id)
+{
+    mixer_output_add_stream_dev(mixer_output_from_id(output_id));
+}
+
+void mixer_output_remove_stream(int output_id, aud_stream_node* stream)
+{
+    mixer_output_remove_stream_dev(mixer_output_from_id(output_id), stream);
+}
 
 void mixer_output_set_default(int output_id)
 {
