@@ -124,6 +124,13 @@ int main(int argc, char** argv)
         }
     }
 
+    int err = aud_backend_initialize();
+    if (err != 0)
+    {
+        fprintf(stderr, "aud_backend_initialize returned %d\n", err);
+        return -1;
+    }
+
     struct pollfd *fds = calloc(3, sizeof(struct pollfd));
     size_t nToPoll = 0;
 
