@@ -121,5 +121,15 @@ typedef struct aud_packet
 int autrans_transmit(int fd, const aud_packet* pckt);
 int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len);
 int autrans_initial_connection_request(int fd);
+int autrans_disconnect(int fd);
+
+int autrans_open();
+/*
+ * Valid URIs:
+ * tcp:addr[:port]
+ * unix:path/server index
+ */
+int autrans_open_uri(const char* addr);
+int autrans_open_addr(struct sockaddr* addr, socklen_t addr_len);
 
 #define OBOS_AUD_TCP_PORT 44630

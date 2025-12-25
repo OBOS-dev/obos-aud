@@ -37,3 +37,7 @@
 #define aud_hton64(x) aud_ntoh64(x)
 
 #define PACK __attribute__((packed))
+#define WEAK __attribute__((weak))
+
+#define STRINGIFY_PROTO(x) #x
+#define STRINGIFY(x) STRINGIFY_PROTO(x)
