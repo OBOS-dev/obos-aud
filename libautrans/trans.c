@@ -4,8 +4,6 @@
  * Copyright (c) 2025 Omar Berrow
  */
 
- #include <asm-generic/errno.h>
-#include <bits/sockaddr.h>
 #define _GNU_SOURCE 1
  
 #include <ctype.h>

@@ -7,11 +7,13 @@
 #define _GNU_SOURCE 1
 
 #include <obos-aud/trans.h>
+#include <obos-aud/compiler.h>
 
 #include <obos-aud/priv/con.h>
 #include <obos-aud/priv/mixer.h>
 
 #include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -52,9 +54,10 @@ static void quit(int s)
     exit(0);
 }
 
-static void remove_unix_socket(int status, void* filename)
+static const char* s_unix_socket_filename = NULL;
+static void remove_unix_socket()
 {
-    remove(filename);
+    remove(s_unix_socket_filename);
 }
 
 int main(int argc, char** argv)
@@ -194,8 +197,9 @@ int main(int argc, char** argv)
         return -1;
     }
     
+    s_unix_socket_filename = unix_addr.sun_path;
     if (unix_listen)
-        on_exit(remove_unix_socket, unix_addr.sun_path);
+        atexit(remove_unix_socket);
     signal(SIGINT, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGQUIT, quit);

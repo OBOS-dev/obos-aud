@@ -74,7 +74,7 @@ static void* process_audio(void* arg)
 
 #define FIFO_NAME "obos-aud-output"
 
-static void delete_fifo(int, void*)
+static void delete_fifo()
 {
     unlink(FIFO_NAME);
 }
@@ -88,7 +88,7 @@ int aud_backend_initialize()
     s_backend_file_output = open(FIFO_NAME, O_WRONLY);
     if (s_backend_file_output < 0)
         return s_backend_file_output;
-    on_exit(delete_fifo, NULL);
+    atexit(delete_fifo);
     pthread_create(&s_backend_thread, NULL, process_audio, NULL);
     aud_backend_output_play(1, false);
     return 0;

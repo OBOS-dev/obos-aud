@@ -9,7 +9,11 @@
 
 #pragma once
 
+#define _GNU_SOURCE 1
+
 #include <stdint.h>
+#include <errno.h>
+// #include <unistd.h>
 
 #ifndef __GNUC__
 #   error GNU C Compiler required for obos-aud headers
@@ -41,3 +45,14 @@
 
 #define STRINGIFY_PROTO(x) #x
 #define STRINGIFY(x) STRINGIFY_PROTO(x)
+
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) \
+({\
+    int result = 0;\
+    do {\
+        result = (int)(expression);\
+    } while(result < 0 && errno == EINTR);\
+    (result);\
+})
+#endif
