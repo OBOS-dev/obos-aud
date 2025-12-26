@@ -274,7 +274,10 @@ static void* mixer_worker(void* arg)
         {
             printf("mixer: idling output device\n");
             aud_backend_output_play(dev->info.output_id, false);
+            free(buffer);
             pthread_cond_wait(&dev->streams.evnt, &dev->streams.lock);
+            buffer = malloc(buffer_len);
+            memset(buffer, 0x00, buffer_len);
         }
         pthread_mutex_unlock(&dev->streams.lock);
         aud_backend_output_play(dev->info.output_id, true);
