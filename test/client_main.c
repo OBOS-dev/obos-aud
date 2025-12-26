@@ -4,8 +4,9 @@
  * Copyright (c) 2025 Omar Berrow
  */
 
-#include <fcntl.h>
 #define _GNU_SOURCE 1
+
+#include <fcntl.h>
  
 #include <obos-aud/trans.h>
 #include <obos-aud/output.h>
@@ -175,6 +176,7 @@ int main(int argc, char** argv)
         }
         else
             fprintf(stderr, "While querying default output: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
         goto die;
     } while(0);
 
@@ -241,7 +243,8 @@ int main(int argc, char** argv)
         }
         else
             fprintf(stderr, "While opening stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
-        goto die;
+        free(reply.payload);
+    goto die;
     } while(0);
 
     size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * sizeof(int16_t);
@@ -276,7 +279,7 @@ int main(int argc, char** argv)
         }
         else
             fprintf(stderr, "While writing to stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
-        
+        free(reply.payload);        
     }
     if (avail < 0)
         perror("read");
