@@ -255,17 +255,13 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
         autrans_transmit(client->fd, &resp);
         return;
     }
-    aud_stream_node* node = mixer_output_add_stream_dev(dev);
-    aud_stream_initialize(&node->data, payload->target_sample_rate, payload->input_channels);
-    node->owner = client;
-    dev->input_channels += payload->input_channels;
+    aud_stream_node* node = mixer_output_add_stream_dev(dev, payload->target_sample_rate, payload->input_channels, payload->volume, client);
 
     pthread_mutex_lock(&client->stream_handles.lock);
     obos_aud_stream_handle* hnd = calloc(1, sizeof(obos_aud_stream_handle));
     hnd->stream_id = client->stream_handles.next_stream_id++;
     hnd->stream_node = node;
     hnd->dev = dev;
-    hnd->stream_node->data.volume = mixer_normalize_volume(payload->volume);
     
     if (!client->stream_handles.head)
         client->stream_handles.head = hnd;

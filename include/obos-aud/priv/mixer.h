@@ -21,11 +21,11 @@
 
 typedef struct aud_stream_node {
     aud_stream data;
-    uint64_t time_offset_us;
     /* for averaging, not guaranteed to exist */
     int16_t* input_samples_arr;
     int sample_count;
     bool dead;
+    int last_output_idx;
     struct obos_aud_connection* owner;
     struct aud_stream_node *next, *prev;
 } aud_stream_node;
@@ -36,6 +36,7 @@ typedef struct mixer_output_device {
         aud_stream_node *head, *tail;
         size_t nNodes;
         pthread_mutex_t lock;
+        pthread_cond_t evnt;
     } streams;
     int input_channels;
     int sample_rate;
@@ -55,10 +56,10 @@ void mixer_output_initialize(mixer_output_device* dev);
 
 mixer_output_device* mixer_output_from_id(int output_id);
 
-aud_stream_node* mixer_output_add_stream(int output_id);
+aud_stream_node* mixer_output_add_stream(int output_id, int sample_rate, int channels, float volume, struct obos_aud_connection* owner);
 void mixer_output_remove_stream(int output_id, aud_stream_node* stream);
 
-aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev);
+aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev, int sample_rate, int channels, float volume, struct obos_aud_connection* owner);
 void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* stream);
 void mixer_output_remove_stream_dev_unlocked(mixer_output_device* dev, aud_stream_node* stream);
 

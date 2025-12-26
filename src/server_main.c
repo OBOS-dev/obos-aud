@@ -232,7 +232,7 @@ int main(int argc, char** argv)
         {
             if (!fds[i].revents)
                 continue;
-            if (fds[i].revents & POLLERR || fds[i].revents & POLLNVAL)
+            if (fds[i].revents & POLLERR || fds[i].revents & POLLNVAL || fds[i].revents & POLLHUP)
             {
                 obos_aud_process_disconnect(obos_aud_get_client_by_fd(fds[i].fd), NULL);
                 if (i != (nToPoll - 1))

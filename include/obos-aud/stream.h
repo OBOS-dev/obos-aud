@@ -26,7 +26,7 @@ typedef struct aud_stream {
 
 void aud_stream_initialize(aud_stream* stream, int sample_rate, int channels);
 void aud_stream_push(aud_stream* stream, const void* data, size_t len);
-void aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek);
+bool aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek, bool blocking);
 
 void aud_stream_lock(aud_stream* stream);
 void aud_stream_unlock(aud_stream* stream);

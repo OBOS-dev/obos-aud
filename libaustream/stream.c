@@ -47,11 +47,19 @@ void aud_stream_push(aud_stream* stream, const void* data, size_t len)
     pthread_mutex_unlock(&stream->mut);
 }
 
-void aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek)
+bool aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek, bool blocking)
 {
     up:
-    while ((stream->ptr - stream->in_ptr) < len)
-        sched_yield();
+    if (blocking)
+    {
+        while ((stream->ptr - stream->in_ptr) < len)
+            sched_yield();
+    }
+    else
+    {
+        if ((stream->ptr - stream->in_ptr) < len)
+            return false;
+    }
     if (pthread_mutex_trylock(&stream->mut) == EBUSY)
         goto up;
     if (data)
@@ -63,6 +71,7 @@ void aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek)
             stream->in_ptr = stream->ptr = 0;
     }
     aud_stream_unlock(stream);
+    return true;
 }
 
 void aud_stream_lock(aud_stream* stream)

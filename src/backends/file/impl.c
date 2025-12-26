@@ -40,6 +40,9 @@ static aud_output_dev s_backend_outputs[OUTPUT_COUNT] = {
 static int s_sample_rate = 0;
 static int s_channels = 0;
 static int s_format_size = 0;
+static bool s_playing = false;
+static pthread_cond_t s_playing_event = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t s_playing_mut = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_mutex_t s_buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct {
@@ -51,8 +54,10 @@ static void* process_audio(void* arg)
 {
     while (1)
     {
-        while (!s_sample_rate)
-            sched_yield();
+        pthread_mutex_lock(&s_playing_mut);
+        if (!s_playing)
+            pthread_cond_wait(&s_playing_event, &s_playing_mut);
+        pthread_mutex_unlock(&s_playing_mut);
         
         pthread_mutex_lock(&s_buffer_lock);
         void* buf = s_buffer.buf;
@@ -144,10 +149,11 @@ int aud_backend_output_play(int output_id, bool play)
         return -1;
     if (!s_sample_rate)
         return -1;
-    if (play)
-        pthread_kill(s_backend_thread, SIGCONT);
-    else
-        pthread_kill(s_backend_thread, SIGSTOP);
+    pthread_mutex_lock(&s_playing_mut);
+    s_playing = play;
+    if (s_playing)
+        pthread_cond_signal(&s_playing_event);
+    pthread_mutex_unlock(&s_playing_mut);
     return -1;
 }
 

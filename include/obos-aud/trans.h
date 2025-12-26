@@ -96,7 +96,7 @@ typedef struct aud_get_volume_reply {
 
 typedef struct aud_open_stream_payload {
     uint16_t output_id;
-    uint16_t target_sample_rate;
+    uint32_t target_sample_rate;
     uint8_t input_channels;
     float volume;
 } PACK aud_open_stream_payload;

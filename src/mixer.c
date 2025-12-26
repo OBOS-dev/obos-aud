@@ -38,6 +38,18 @@ static float unnormalize(float input, float min, float max)
     return input * half_range + average;
 }
 
+static float normalize_pos(float input, float min, float max)
+{
+    assert(max - min);
+    return (input - min) / (max - min);
+}
+
+static float unnormalize_pos(float input, float min, float max)
+{
+    assert(max - min);
+    return (input+min) * (max-min);
+}
+
 static float clamp(float value, float min, float max)
 {
     return value < min ? min : ((value > max) ? max : value);
@@ -109,6 +121,7 @@ static bool settings_match(int output_id, int sample_rate, int channels, int for
 void mixer_output_initialize(mixer_output_device* dev)
 {
     dev->streams.lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    dev->streams.evnt = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
     int sample_rates[8] = {
         44100,
         22050,
@@ -160,18 +173,24 @@ mixer_output_device* mixer_output_from_id(int output_id)
     return NULL;
 }
 
-aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev)
+aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev, int sample_rate, int channels, float volume, struct obos_aud_connection* owner)
 {
     if (!dev)
         return NULL;
     aud_stream_node* node = calloc(1, sizeof(*node));
     pthread_mutex_lock(&dev->streams.lock);
+    aud_stream_initialize(&node->data, sample_rate, channels);
+    node->data.volume = mixer_normalize_volume(volume);
+    node->owner = owner;
     if (!dev->streams.head)
         dev->streams.head = node;
     if (dev->streams.tail)
         dev->streams.tail->next = node;
     node->prev = dev->streams.tail;
     dev->streams.tail = node;
+    dev->input_channels += channels;
+    if (!dev->streams.nNodes)
+        pthread_cond_signal(&dev->streams.evnt);
     dev->streams.nNodes++;
     pthread_mutex_unlock(&dev->streams.lock);
     return node;
@@ -203,9 +222,9 @@ void mixer_output_remove_stream_dev_unlocked(mixer_output_device* dev, aud_strea
     free(stream);
 }
 
-aud_stream_node* mixer_output_add_stream(int output_id)
+aud_stream_node* mixer_output_add_stream(int output_id, int sample_rate, int channels, float volume, struct obos_aud_connection* owner)
 {
-    mixer_output_add_stream_dev(mixer_output_from_id(output_id));
+    return mixer_output_add_stream_dev(mixer_output_from_id(output_id), sample_rate, channels, volume, owner);
 }
 
 void mixer_output_remove_stream(int output_id, aud_stream_node* stream)
@@ -224,11 +243,11 @@ void mixer_output_set_default(int output_id)
 
 float mixer_normalize_volume(float volume)
 {
-    return normalize(volume, 0, 100);
+    return normalize_pos(volume, 0, 100);
 }
 float mixer_get_volume(float volume)
 {
-    return unnormalize(volume, 0, 100);
+    return unnormalize_pos(volume, 0, 100);
 }
 
 void mixer_output_set_volume(mixer_output_device* dev, float volume)
@@ -245,17 +264,22 @@ float mixer_output_get_volume(mixer_output_device* dev);
 static void* mixer_worker(void* arg)
 {
     mixer_output_device* dev = arg;
-    aud_backend_output_play(dev->info.output_id, true);
     size_t buffer_len = dev->sample_rate * dev->channels * sizeof(uint16_t);
     uint16_t* buffer = malloc(buffer_len);
     memset(buffer, 0x00, buffer_len);
     while (1)
     {
-        sched_yield();
-        uint64_t time_offset_us = 0;
+        pthread_mutex_lock(&dev->streams.lock);
+        if (!dev->streams.nNodes)
+        {
+            printf("mixer: idling output device\n");
+            aud_backend_output_play(dev->info.output_id, false);
+            pthread_cond_wait(&dev->streams.evnt, &dev->streams.lock);
+        }
+        pthread_mutex_unlock(&dev->streams.lock);
+        aud_backend_output_play(dev->info.output_id, true);
         for (int i = 0; i < dev->sample_rate && dev->input_channels; i++)
         {
-            time_offset_us = (i/((float)dev->sample_rate) * 1000000);
             pthread_mutex_lock(&dev->streams.lock);
             int input_channels = dev->input_channels;
             float *samples = calloc(input_channels, sizeof(float));
@@ -269,7 +293,7 @@ static void* mixer_worker(void* arg)
                 aud_stream* const stream = &node->data;
                 aud_stream_lock(stream);
                 float volume = stream->volume * node->owner->volume * dev->volume;
-                if (!stream->ptr)
+                if (!(stream->ptr - stream->in_ptr))
                 {
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(0, -0x10000, 0x10000);
@@ -280,7 +304,7 @@ static void* mixer_worker(void* arg)
                 if (stream->sample_rate == dev->sample_rate)
                 {
                     int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
-                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false);
+                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
                     free(i_samples);
@@ -295,11 +319,17 @@ static void* mixer_worker(void* arg)
                 }
                 else if (stream->sample_rate < dev->sample_rate)
                 {
-                    node->time_offset_us = i/stream->sample_rate * 1000000;
-                    if (time_offset_us >= node->time_offset_us && (time_offset_us > 0))
-                        aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false);
+                    /*
+                        if one input sample = two output samples...
+                        then advance the stream every two output samples
+                    */
+                    if ((node->last_output_idx + (dev->sample_rate/stream->sample_rate)) == i)
+                    {
+                        node->last_output_idx = i; 
+                        aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false, false);
+                    }
                     int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
-                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true);
+                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
                     free(i_samples);
@@ -319,8 +349,8 @@ static void* mixer_worker(void* arg)
                     int16_t *input_samples = node->input_samples_arr ?
                         node->input_samples_arr :
                         (node->input_samples_arr = calloc(sample_count * stream->channels, sizeof(int16_t)));
-                    
-                    aud_stream_read(stream, input_samples, sample_count*sizeof(int16_t), false);
+
+                    aud_stream_read(stream, input_samples, sample_count*sizeof(int16_t), false, false);
                     for (int c = 0; c < stream->channels; c++)
                     {
                         for (int s_idx = 0; s_idx < sample_count; s_idx++)
@@ -336,20 +366,29 @@ static void* mixer_worker(void* arg)
                         goto up;
                     }
                 }
+                if (i == (dev->sample_rate-1))
+                    node->last_output_idx = 0;
             }
             if (input_channels <= dev->channels)
-                for (int c = 0; c < dev->channels; c++)
+                for (int c = 0; c < dev->channels && input_channels != 0; c++)
                     buffer[i*dev->channels+c] = (int16_t)unnormalize(samples[c % input_channels], -0x10000, 0x10000);
             else
             {
                 float* condensed_samples = calloc(dev->channels, sizeof(float));
                 int samples_per_channel = input_channels / dev->channels;
-                int remainder = input_channels % dev->channels;
-                int additional_per_channel = (int)ceilf(remainder / (float)dev->channels);
+                int extra_samples = input_channels % dev->channels;
+                int additional_samples_per_channel = extra_samples / dev->channels;
+                if (!additional_samples_per_channel)
+                    additional_samples_per_channel = 1;
                 int sample_idx = 0;
                 for (int c = 0; c < dev->channels; c++)
                 {
-                    size_t samples_this_channel = (samples_per_channel + (remainder ? additional_per_channel : 0));
+                    size_t samples_this_channel = samples_per_channel;
+                    if (extra_samples)
+                    {
+                        extra_samples -= additional_samples_per_channel;
+                        samples_per_channel += additional_samples_per_channel;
+                    }
                     for (int idx = 0; idx < samples_this_channel; idx++)
                         condensed_samples[c] += samples[sample_idx++];
                     
