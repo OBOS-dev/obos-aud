@@ -132,6 +132,7 @@ int main(int argc, char** argv)
         {
             aud_query_output_device_reply *payload = reply.payload;
             memcpy(&output_info, &payload->info, MIN(sizeof(output_info), reply.payload_len));
+            free(payload);
             break;
         }
 
@@ -154,6 +155,7 @@ int main(int argc, char** argv)
     stream_info.input_channels = 2;
     stream_info.target_sample_rate = 44100;
     stream_info.output_id = output;
+    stream_info.volume = 100;
     do {
 
         aud_packet pckt = {};
@@ -191,6 +193,7 @@ int main(int argc, char** argv)
         {
             aud_open_stream_reply *payload = reply.payload;
             stream = payload->stream_id;
+            free(payload);
             break;
         }
 
@@ -241,6 +244,7 @@ int main(int argc, char** argv)
     }
     if (avail < 0)
         perror("read");
+    free(payload);
 
     die:
     autrans_disconnect(socket, client_id);

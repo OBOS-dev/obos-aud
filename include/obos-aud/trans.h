@@ -29,11 +29,18 @@ enum aud_opcode {
     OBOS_AUD_CLOSE_STREAM,
     OBOS_AUD_DATA,
     OBOS_AUD_QUERY_OUTPUT_DEVICE,
+    OBOS_AUD_STREAM_SET_VOLUME,
+    OBOS_AUD_STREAM_GET_VOLUME,
+    OBOS_AUD_OUTPUT_SET_VOLUME,
+    OBOS_AUD_OUTPUT_GET_VOLUME,
+    OBOS_AUD_CONNECTION_SET_VOLUME,
+    OBOS_AUD_CONNECTION_GET_VOLUME,
 
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
     OBOS_AUD_OPEN_STREAM_REPLY,
     OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY,
+    OBOS_AUD_GET_VOLUME_REPLY,
 
     /*
      * All status replies have no required payload,
@@ -78,6 +85,10 @@ typedef struct aud_query_output_device_reply {
     aud_output_dev info;
 } PACK aud_query_output_device_reply;
 
+typedef struct aud_get_volume_reply {
+    float volume;
+} PACK aud_get_volume_reply;
+
 /* Payload structures */
 /**************************************************/
 
@@ -87,7 +98,22 @@ typedef struct aud_open_stream_payload {
     uint16_t output_id;
     uint16_t target_sample_rate;
     uint8_t input_channels;
+    float volume;
 } PACK aud_open_stream_payload;
+
+typedef struct aud_set_volume_payload {
+    /* The type of this id depends on the opcode. */
+    union {
+        uint16_t obj_id;
+        uint32_t obj_id32;
+    };
+    float volume;
+} PACK aud_set_volume_payload;
+typedef union aud_get_volume_payload {
+    /* The type of this id depends on the opcode. */
+    uint16_t obj_id;
+    uint32_t obj_id32;
+} PACK aud_get_volume_payload;
 
 typedef struct aud_close_stream_payload {
     uint16_t stream_id;

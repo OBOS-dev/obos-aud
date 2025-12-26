@@ -5,11 +5,14 @@
  */
 
 #include <obos-aud/trans.h>
+#include <obos-aud/stream.h>
 #include <obos-aud/priv/con.h>
+#include <obos-aud/priv/backend.h>
 
 #include <pthread.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <sys/poll.h>
 
@@ -58,6 +61,7 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
     ret->fd = fd;
     ret->stream_handles.lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
     ret->stream_handles.next_stream_id = 1;
+    ret->volume = mixer_normalize_volume(100);
     
     pthread_mutex_lock(&g_connections.lock);
     if (!g_connections.head)
@@ -86,6 +90,126 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
     free(payload);
 
     return ret;
+}
+
+#define set_volume_common(pckt, client, fetch_obj, obj_type, volume_field, id_suffix)\
+do {\
+    if (pckt->payload_len != sizeof(aud_set_volume_payload))\
+    {\
+        aud_packet resp = {};\
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
+        resp.client_id = client->client_id;\
+        resp.payload = "Invalid payload length.";\
+        resp.payload_len = 24;\
+        resp.transmission_id = pckt->transmission_id;\
+        resp.transmission_id_valid = true;\
+        autrans_transmit(client->fd, &resp);\
+        return;\
+    }\
+    aud_set_volume_payload* payload = pckt->payload;\
+    obj_type* obj = fetch_obj(payload->obj_id##id_suffix);\
+    if (!obj) \
+    {\
+        aud_packet resp = {};\
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
+        resp.client_id = client->client_id;\
+        resp.payload = "Invalid object id.";\
+        resp.payload_len = 19;\
+        resp.transmission_id = pckt->transmission_id;\
+        resp.transmission_id_valid = true;\
+        autrans_transmit(client->fd, &resp);\
+        return;\
+    }\
+    obj->volume_field = mixer_normalize_volume(payload->volume);\
+\
+    aud_packet resp = {};\
+    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;\
+    resp.client_id = client->client_id;\
+    resp.payload = NULL;\
+    resp.payload_len = 0;\
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;\
+    resp.transmission_id_valid = !!pckt;\
+    autrans_transmit(client->fd, &resp);\
+} while(0)
+
+#define get_volume_common(pckt, client, fetch_obj, obj_type, volume_field, id_suffix)\
+do {\
+    if (pckt->payload_len != sizeof(aud_get_volume_payload))\
+    {\
+        aud_packet resp = {};\
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
+        resp.client_id = client->client_id;\
+        resp.payload = "Invalid payload length.";\
+        resp.payload_len = 24;\
+        resp.transmission_id = pckt->transmission_id;\
+        resp.transmission_id_valid = true;\
+        autrans_transmit(client->fd, &resp);\
+        return;\
+    }\
+    aud_get_volume_payload* payload = pckt->payload;\
+    obj_type* obj = fetch_obj(payload->obj_id##id_suffix);\
+    if (!obj) \
+    {\
+        aud_packet resp = {};\
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
+        resp.client_id = client->client_id;\
+        resp.payload = "Invalid object id.";\
+        resp.payload_len = 19;\
+        resp.transmission_id = pckt->transmission_id;\
+        resp.transmission_id_valid = true;\
+        autrans_transmit(client->fd, &resp);\
+        return;\
+    }\
+\
+    aud_get_volume_reply reply = {};\
+    reply.volume = mixer_get_volume(obj->volume_field);\
+\
+    aud_packet resp = {};\
+    resp.opcode = OBOS_AUD_GET_VOLUME_REPLY;\
+    resp.client_id = client->client_id;\
+    resp.payload = &reply;\
+    resp.payload_len = sizeof(reply);\
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;\
+    resp.transmission_id_valid = !!pckt;\
+    autrans_transmit(client->fd, &resp);\
+} while(0)
+
+void obos_aud_process_stream_set_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+#define get_stream_id(x) obos_aud_get_stream_by_id(client, x)
+    set_volume_common(pckt, client, get_stream_id, obos_aud_stream_handle, stream_node->data.volume, );
+#undef get_stream_id
+}
+
+void obos_aud_process_conn_set_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+#define get_con_id(x) obos_aud_get_client(-1, x)
+    set_volume_common(pckt, client, get_con_id, obos_aud_connection, volume, 32);
+#undef get_con_id
+}
+
+void obos_aud_process_output_set_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+    set_volume_common(pckt, client, mixer_output_from_id, mixer_output_device, volume, );
+}
+
+void obos_aud_process_stream_get_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+#define get_stream_id(x) obos_aud_get_stream_by_id(client, x)
+    set_volume_common(pckt, client, get_stream_id, obos_aud_stream_handle, stream_node->data.volume, );
+#undef get_stream_id
+}
+
+void obos_aud_process_output_get_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+    get_volume_common(pckt, client, mixer_output_from_id, mixer_output_device, volume, );
+}
+
+void obos_aud_process_conn_get_volume(obos_aud_connection* client, aud_packet* pckt)
+{
+#define get_con_id(x) obos_aud_get_client(-1, x)
+    set_volume_common(pckt, client, get_con_id, obos_aud_connection, volume, 32);
+#undef get_con_id
 }
 
 void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
@@ -133,12 +257,16 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
     }
     aud_stream_node* node = mixer_output_add_stream_dev(dev);
     aud_stream_initialize(&node->data, payload->target_sample_rate, payload->input_channels);
+    node->owner = client;
+    dev->input_channels += payload->input_channels;
 
     pthread_mutex_lock(&client->stream_handles.lock);
     obos_aud_stream_handle* hnd = calloc(1, sizeof(obos_aud_stream_handle));
     hnd->stream_id = client->stream_handles.next_stream_id++;
     hnd->stream_node = node;
     hnd->dev = dev;
+    hnd->stream_node->data.volume = mixer_normalize_volume(payload->volume);
+    
     if (!client->stream_handles.head)
         client->stream_handles.head = hnd;
     if (client->stream_handles.tail)
@@ -191,6 +319,57 @@ void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt
     }
 
     obos_aud_stream_close(client, hnd, true);
+
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
+    resp.client_id = client->client_id;
+    resp.payload = NULL;
+    resp.payload_len = 0;
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id_valid = !!pckt;
+    autrans_transmit(client->fd, &resp);
+}
+
+void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt)
+{
+    if (pckt->payload_len < sizeof(aud_data_payload))
+    {
+        aud_packet resp = {};
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
+        resp.client_id = client->client_id;
+        resp.payload = "Invalid payload length.";
+        resp.payload_len = 24;
+        resp.transmission_id = pckt->transmission_id;
+        resp.transmission_id_valid = true;
+        autrans_transmit(client->fd, &resp);
+        return;
+    }
+
+    aud_data_payload* payload = pckt->payload;
+    // aud_backend_queue_data(1, payload->data);
+    obos_aud_stream_handle* stream = obos_aud_get_stream_by_id(client, payload->stream_id);
+    if (!stream)
+    {
+        aud_packet resp = {};
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
+        resp.client_id = client->client_id;
+        resp.payload = "Invalid stream ID.";
+        resp.payload_len = 19;
+        resp.transmission_id = pckt->transmission_id;
+        resp.transmission_id_valid = true;
+        autrans_transmit(client->fd, &resp);
+        return;
+    }
+    aud_stream_push(&stream->stream_node->data, payload->data, pckt->payload_len-sizeof(*payload));
+
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
+    resp.client_id = client->client_id;
+    resp.payload = NULL;
+    resp.payload_len = 0;
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id_valid = !!pckt;
+    autrans_transmit(client->fd, &resp);
 }
 
 void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* hnd, bool locked)

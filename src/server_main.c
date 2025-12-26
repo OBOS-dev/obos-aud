@@ -326,6 +326,9 @@ int main(int argc, char** argv)
                 case OBOS_AUD_QUERY_OUTPUT_DEVICE:
                     obos_aud_process_output_device_query(con, &curr->pckt);
                     break;
+                case OBOS_AUD_DATA:
+                    obos_aud_process_data(con, &curr->pckt);
+                    break;
 
                 case OBOS_AUD_STATUS_REPLY_OK:
                 case OBOS_AUD_STATUS_REPLY_UNSUPPORTED:

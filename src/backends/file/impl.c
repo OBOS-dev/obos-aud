@@ -16,6 +16,8 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
 #include <sys/param.h>
 #include <sys/mman.h>
@@ -59,7 +61,8 @@ static void* process_audio(void* arg)
         s_buffer.len = 0;
         pthread_mutex_unlock(&s_buffer_lock);
 
-        write(s_backend_file_output, buf, len);
+        TEMP_FAILURE_RETRY(write(s_backend_file_output, buf, len));
+        free(buf);
     }
     return NULL;
 }
@@ -73,7 +76,11 @@ static void delete_fifo(int, void*)
 
 int aud_backend_initialize()
 {
-    s_backend_file_output = mkfifo(FIFO_NAME, 777);
+    errno = 0;
+    int res = mkfifo(FIFO_NAME, 0777);
+    if (res < 0)
+        return s_backend_file_output;
+    s_backend_file_output = open(FIFO_NAME, O_WRONLY);
     if (s_backend_file_output < 0)
         return s_backend_file_output;
     on_exit(delete_fifo, NULL);
@@ -125,6 +132,8 @@ int aud_backend_queue_data(int output_id, const void* buf)
     memcpy(s_buffer.buf+s_buffer.len, buf, new_len - s_buffer.len);
     s_buffer.len = new_len;
     pthread_mutex_unlock(&s_buffer_lock);
+    while (s_buffer.len)
+        sched_yield();
 
     return 0;
 }

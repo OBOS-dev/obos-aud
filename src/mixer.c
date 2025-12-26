@@ -6,16 +6,44 @@
 
 #include <obos-aud/priv/mixer.h>
 #include <obos-aud/priv/backend.h>
+#include <obos-aud/priv/con.h>
+
+#include <obos-aud/stream.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include <errno.h>
 #include <pthread.h>
+#include <math.h>
 
 mixer_output_device* g_outputs;
 size_t g_output_count;
 mixer_output_device* g_default_output;
+
+static float normalize(float input, float min, float max)
+{
+    float average = (min + max) / 2.0f;
+    float half_range = (max - min) / 2.0f;
+    assert(half_range);
+    return (input - average) / half_range;
+}
+
+static float unnormalize(float input, float min, float max)
+{
+    float average = (min + max) / 2.0f;
+    float half_range = (max - min) / 2.0f;
+    assert(half_range);
+    return input * half_range + average;
+}
+
+static float clamp(float value, float min, float max)
+{
+    return value < min ? min : ((value > max) ? max : value);
+}
+
+static void* mixer_worker(void* arg);
 
 void mixer_initialize()
 {
@@ -82,11 +110,11 @@ void mixer_output_initialize(mixer_output_device* dev)
 {
     dev->streams.lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
     int sample_rates[8] = {
-        96000,
-        88200,
-        48000,
         44100,
         22050,
+        88200,
+        96000,
+        48000,
         16000,
         11025,
          8000,
@@ -107,8 +135,13 @@ void mixer_output_initialize(mixer_output_device* dev)
         }
         dev->channels = channels;
         dev->sample_rate = sample_rate;
+        dev->format_size = 16;
         break;
     }
+    mixer_output_set_volume(dev, 100);
+    
+    pthread_create(&dev->worker, NULL, mixer_worker, dev);
+
     printf("Configured output device #%ld with %d channel%c at a sample rate of %dhz\n", 
         dev-g_outputs,
         dev->channels,
@@ -146,9 +179,14 @@ aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev)
 
 void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* stream)
 {
+    pthread_mutex_lock(&dev->streams.lock);
+    mixer_output_remove_stream_dev_unlocked(dev, stream);
+    pthread_mutex_unlock(&dev->streams.lock);
+}
+void mixer_output_remove_stream_dev_unlocked(mixer_output_device* dev, aud_stream_node* stream)
+{
     if (!dev)
         return;
-    pthread_mutex_lock(&dev->streams.lock);
     if (stream->next)
         stream->next->prev = stream->prev;
     if (stream->prev)
@@ -158,7 +196,10 @@ void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* s
     if (dev->streams.tail == stream)
         dev->streams.tail = stream->prev;
     dev->streams.nNodes--;
-    pthread_mutex_unlock(&dev->streams.lock);
+    if (stream->input_samples_arr)
+        free(stream->input_samples_arr);
+    dev->input_channels -= stream->data.channels;
+    free(stream->data.buffer);
     free(stream);
 }
 
@@ -179,4 +220,150 @@ void mixer_output_set_default(int output_id)
         return;
     dev->info.flags |= OBOS_AUD_OUTPUT_FLAGS_DEFAULT;
     g_default_output = dev;
+}
+
+float mixer_normalize_volume(float volume)
+{
+    return normalize(volume, 0, 100);
+}
+float mixer_get_volume(float volume)
+{
+    return unnormalize(volume, 0, 100);
+}
+
+void mixer_output_set_volume(mixer_output_device* dev, float volume)
+{
+    dev->volume = mixer_normalize_volume(volume);
+}
+float mixer_output_get_volume(mixer_output_device* dev)
+{
+    return mixer_get_volume(dev->volume);
+}
+
+float mixer_output_get_volume(mixer_output_device* dev);
+
+static void* mixer_worker(void* arg)
+{
+    mixer_output_device* dev = arg;
+    aud_backend_output_play(dev->info.output_id, true);
+    size_t buffer_len = dev->sample_rate * dev->channels * sizeof(uint16_t);
+    uint16_t* buffer = malloc(buffer_len);
+    memset(buffer, 0x00, buffer_len);
+    while (1)
+    {
+        sched_yield();
+        uint64_t time_offset_us = 0;
+        for (int i = 0; i < dev->sample_rate && dev->input_channels; i++)
+        {
+            time_offset_us = (i/((float)dev->sample_rate) * 1000000);
+            pthread_mutex_lock(&dev->streams.lock);
+            int input_channels = dev->input_channels;
+            float *samples = calloc(input_channels, sizeof(float));
+            int j = 0;
+            for (aud_stream_node* node = dev->streams.head; node; node = node->next)
+            {
+                up:
+                (void)0;
+                if (!node)
+                    break;
+                aud_stream* const stream = &node->data;
+                aud_stream_lock(stream);
+                float volume = stream->volume * node->owner->volume * dev->volume;
+                if (!stream->ptr)
+                {
+                    for (int i = 0; i < stream->channels; i++)
+                        samples[j++] = normalize(0, -0x10000, 0x10000);
+                    aud_stream_unlock(stream);
+                    continue;
+                }
+                aud_stream_unlock(stream);
+                if (stream->sample_rate == dev->sample_rate)
+                {
+                    int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
+                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false);
+                    for (int i = 0; i < stream->channels; i++)
+                        samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
+                    free(i_samples);
+                    if (node->dead && !stream->ptr)
+                    {
+                        aud_stream_node* next = node->next;
+                        mixer_output_remove_stream_dev_unlocked(dev, node);
+                        node = next;
+                        goto up;
+                    }
+                    continue;
+                }
+                else if (stream->sample_rate < dev->sample_rate)
+                {
+                    node->time_offset_us = i/stream->sample_rate * 1000000;
+                    if (time_offset_us >= node->time_offset_us && (time_offset_us > 0))
+                        aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false);
+                    int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
+                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true);
+                    for (int i = 0; i < stream->channels; i++)
+                        samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
+                    free(i_samples);
+                    if (node->dead && !stream->ptr)
+                    {
+                        aud_stream_node* next = node->next;
+                        mixer_output_remove_stream_dev_unlocked(dev, node);
+                        node = next;
+                        goto up;
+                    }
+                }
+                else
+                {
+                    int sample_count = node->sample_count ? 
+                        node->sample_count : 
+                        (node->sample_count = stream->sample_rate / dev->sample_rate);
+                    int16_t *input_samples = node->input_samples_arr ?
+                        node->input_samples_arr :
+                        (node->input_samples_arr = calloc(sample_count * stream->channels, sizeof(int16_t)));
+                    
+                    aud_stream_read(stream, input_samples, sample_count*sizeof(int16_t), false);
+                    for (int c = 0; c < stream->channels; c++)
+                    {
+                        for (int s_idx = 0; s_idx < sample_count; s_idx++)
+                            samples[j] += input_samples[s_idx + c * stream->channels];
+                        samples[j++] /= sample_count;
+                        samples[j-1] = normalize(samples[j-1], -0x10000, 0x10000) * volume;
+                    }
+                    if (node->dead && !stream->ptr)
+                    {
+                        aud_stream_node* next = node->next;
+                        mixer_output_remove_stream_dev_unlocked(dev, node);
+                        node = next;
+                        goto up;
+                    }
+                }
+            }
+            if (input_channels <= dev->channels)
+                for (int c = 0; c < dev->channels; c++)
+                    buffer[i*dev->channels+c] = (int16_t)unnormalize(samples[c % input_channels], -0x10000, 0x10000);
+            else
+            {
+                float* condensed_samples = calloc(dev->channels, sizeof(float));
+                int samples_per_channel = input_channels / dev->channels;
+                int remainder = input_channels % dev->channels;
+                int additional_per_channel = (int)ceilf(remainder / (float)dev->channels);
+                int sample_idx = 0;
+                for (int c = 0; c < dev->channels; c++)
+                {
+                    size_t samples_this_channel = (samples_per_channel + (remainder ? additional_per_channel : 0));
+                    for (int idx = 0; idx < samples_this_channel; idx++)
+                        condensed_samples[c] += samples[sample_idx++];
+                    
+                    condensed_samples[c] = clamp(condensed_samples[c], -1, 1);
+                }
+                for (int c = 0; c < dev->channels; c++)
+                    buffer[i*dev->channels+c] = unnormalize(condensed_samples[c], -0x10000, 0x10000);
+                free(condensed_samples);
+            }
+            pthread_mutex_unlock(&dev->streams.lock);
+            free(samples);
+        }
+        aud_backend_queue_data(dev->info.output_id, buffer);
+        memset(buffer, 0x00, buffer_len);
+    }
+    return NULL;
 }

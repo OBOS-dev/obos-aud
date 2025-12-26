@@ -35,6 +35,7 @@ typedef struct obos_aud_stream_handle {
 typedef struct obos_aud_connection {
     int fd;
     uint32_t client_id;
+    float volume;
     struct {
         uint16_t next_stream_id;
         pthread_mutex_t lock;
@@ -53,6 +54,13 @@ obos_aud_connection* obos_aud_get_client_by_fd(int fd);
 
 void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_stream_set_volume(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_output_set_volume(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_conn_set_volume(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_stream_get_volume(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_output_get_volume(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_conn_get_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* hnd, bool locked);
 obos_aud_stream_handle* obos_aud_get_stream_by_id(obos_aud_connection* con, uint16_t stream_id);
 
