@@ -14,24 +14,55 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include <sys/socket.h>
 #include <sys/param.h>
 
-const char* usage = "%s [-d display_uri] input_file\n";
+const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] input_file\n";
 
 int main(int argc, char** argv)
 {
     int opt = 0;
 
     const char* server_uri = NULL;
+    int channels = 2;
+    int sample_rate = 44100;
+    float volume = 100.f;
 
-    while ((opt = getopt(argc, argv, "+hd:")) != -1)
+    while ((opt = getopt(argc, argv, "+hs:c:v:d:")) != -1)
     {
         switch (opt)
         {
             case 'd':
                 server_uri = optarg;
+                break;
+            case 'c':
+                errno = 0;
+                channels = strtol(optarg, NULL, 0);
+                if (errno != 0 || channels <= 0)
+                {
+                    fprintf(stderr, "Expected positive non-zero integer, got %s\n", optarg);
+                    return -1;
+                }
+                break;
+            case 's':
+                errno = 0;
+                sample_rate = strtol(optarg, NULL, 0);
+                if (errno != 0 || sample_rate <= 0)
+                {
+                    fprintf(stderr, "Expected positive non-zero integer, got %s\n", optarg);
+                    return -1;
+                }
+                break;
+            case 'v':
+                errno = 0;
+                volume = strtof(optarg, NULL);
+                if (errno != 0 || volume < 0)
+                {
+                    fprintf(stderr, "Expected positive float, got %s\n", optarg);
+                    return -1;
+                }
                 break;
             case 'h':
             default:
@@ -149,13 +180,18 @@ int main(int argc, char** argv)
 
     output = output_info.output_id;
     printf("Selected %s output at 0x%x\n", aud_output_type_to_str[output_info.type], output);
-    printf("Opening dual-channel stream at 44100hz\n");
+    if (channels == 1)
+        printf("Opening single-channel stream at %dhz\n", sample_rate);
+    else if (channels == 2)
+        printf("Opening dual-channel stream at %dhz\n", sample_rate);
+    else if (channels > 2)
+        printf("Opening stream with %d channels at %dhz\n", channels, sample_rate);
 
     aud_open_stream_payload stream_info = {};
-    stream_info.input_channels = 2;
-    stream_info.target_sample_rate = 44100;
+    stream_info.input_channels = channels;
+    stream_info.target_sample_rate = sample_rate;
     stream_info.output_id = output;
-    stream_info.volume = 100;
+    stream_info.volume = volume;
     do {
 
         aud_packet pckt = {};
