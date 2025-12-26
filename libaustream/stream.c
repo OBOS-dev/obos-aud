@@ -29,13 +29,18 @@ void aud_stream_initialize(aud_stream* stream, int sample_rate, int channels)
 
 void aud_stream_push(aud_stream* stream, const void* data, size_t len)
 {
-    if (len > stream->size)
+    if (len > (stream->size - stream->ptr))
     {
+        while (stream->ptr > 0)
+            sched_yield();
+        size_t initial_len = len;
         while (len)
         {
-            aud_stream_push(stream, data, (len % stream->size) == 0 ? stream->size : len % stream->size);
-            len -= MIN(len, stream->size);
+            size_t nToWrite = len > stream->size ? stream->size : len;
+            aud_stream_push(stream, (const char*)data + (initial_len-len), nToWrite);
+            len -= nToWrite;
         }
+        return;
     }
     up:
     while (stream->ptr == stream->size)
