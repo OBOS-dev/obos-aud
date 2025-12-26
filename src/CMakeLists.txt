@@ -11,3 +11,5 @@ add_executable(obos-aud ${SERVER_SOURCES} $<TARGET_OBJECTS:backend_obj>)
 target_link_libraries(obos-aud PRIVATE autrans_so austream_so m)
 
 target_compile_definitions(obos-aud PRIVATE BUILDING_OBOS_AUD_SERVER=1)
+
+install(TARGETS obos-aud)
