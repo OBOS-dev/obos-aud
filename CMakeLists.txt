@@ -2,7 +2,7 @@
 
 # Copyright (c) 2025 Omar Berrow
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.23)
 
 option(ENABLE_SHARED "Whether to build shared libraries" ON)
 option(ENABLE_STATIC "Whether to build static libraries" OFF)
@@ -27,3 +27,9 @@ add_subdirectory(libautrans)
 add_subdirectory(libaustream)
 add_subdirectory(src)
 add_subdirectory(test)
+
+install(DIRECTORY include/
+    DESTINATION include
+    FILES_MATCHING
+    PATTERN "*.h"
+)
