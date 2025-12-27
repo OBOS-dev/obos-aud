@@ -95,11 +95,10 @@ void mixer_initialize()
             g_default_output = &g_outputs[i];
             break;
         }
-        if (g_outputs[i].info.type == OBOS_AUD_OUTPUT_TYPE_HEADPHONE && !g_default_output)
-        {
+        if (g_outputs[i].info.type == OBOS_AUD_OUTPUT_TYPE_LINE_OUT && (!g_default_output || g_default_output->info.type != OBOS_AUD_OUTPUT_TYPE_SPEAKER))
             g_default_output = &g_outputs[i];
-            break;
-        }
+        if (g_outputs[i].info.type == OBOS_AUD_OUTPUT_TYPE_HEADPHONE && !g_default_output)
+            g_default_output = &g_outputs[i];
     }
     if (!g_default_output)
         g_default_output = &g_outputs[0];
