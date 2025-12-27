@@ -19,7 +19,7 @@ if (ENABLE_ASAN)
     add_link_options(-fsanitize=address)
 endif()
 
-project(obos-aud C)
+project(obos-aud C ASM)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
