@@ -10,6 +10,7 @@
  
 #include <obos-aud/trans.h>
 #include <obos-aud/output.h>
+#include <obos-aud/stream.h>
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -20,7 +21,92 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 
-const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] input_file\n";
+const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-u] input_file\n";
+
+static int stream_set_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t flags)
+{
+    int res = 0;
+    do {
+        aud_stream_set_flags_payload payload = {};
+        payload.stream_id = stream_id;
+        payload.flags = flags;
+
+        aud_packet reply = {};
+        aud_packet pckt = {};
+        pckt.opcode = OBOS_AUD_STREAM_SET_FLAGS;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if (autrans_transmit(socket, &pckt) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_transmit");
+            return -1;
+        }
+    
+        if ((res = autrans_receive(socket, &reply, NULL, 0)) < 0)
+            break;
+        if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+            continue;
+    
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
+    do {
+        aud_stream_get_flags_payload payload = {};
+        payload.stream_id = stream_id;
+
+        aud_packet reply = {};
+        aud_packet pckt = {};
+        pckt.opcode = OBOS_AUD_STREAM_GET_FLAGS;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if ((res = autrans_transmit(socket, &pckt)) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_transmit");
+            return res;
+        }
+    
+        if ((res = autrans_receive(socket, &reply, NULL, 0)) < 0)
+            return res;
+        
+        res = -1;
+        errno = EOPNOTSUPP;
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While fetching stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else if (reply.opcode != OBOS_AUD_STREAM_GET_FLAGS_REPLY)
+            fprintf(stderr, "While fetching stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        else {
+            aud_stream_get_flags_reply* reply_payload = reply.payload;
+            if ((reply_payload->flags & flags) == flags)
+            {
+                res = 0;
+                errno = 0;
+            }
+        }
+        
+        free(reply.payload);
+    } while(0);
+    return res;
+
+}
 
 int main(int argc, char** argv)
 {
@@ -30,8 +116,9 @@ int main(int argc, char** argv)
     int channels = 2;
     int sample_rate = 44100;
     float volume = 100.f;
+    bool ulaw = false;
 
-    while ((opt = getopt(argc, argv, "+hs:c:v:d:")) != -1)
+    while ((opt = getopt(argc, argv, "+hs:c:v:d:u")) != -1)
     {
         switch (opt)
         {
@@ -64,6 +151,9 @@ int main(int argc, char** argv)
                     fprintf(stderr, "Expected positive float, got %s\n", optarg);
                     return -1;
                 }
+                break;
+            case 'u':
+                ulaw = true;
                 break;
             case 'h':
             default:
@@ -246,8 +336,17 @@ int main(int argc, char** argv)
         free(reply.payload);
     goto die;
     } while(0);
+    if (ulaw)
+    {
+        int res = stream_set_flags(socket, client_id, stream, OBOS_AUD_STREAM_FLAGS_ULAW_DECODE);
+        if (res < 0)
+        {
+            fprintf(stderr, "mu-law not supported by server!\n");
+            goto die;
+        }
+    }
 
-    size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * sizeof(int16_t);
+    size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * (ulaw ? sizeof(uint8_t) : sizeof(int16_t));
     aud_data_payload *payload = malloc(buffer_size+sizeof(aud_data_payload));
     payload->stream_id = stream;
     size_t avail = 0;
