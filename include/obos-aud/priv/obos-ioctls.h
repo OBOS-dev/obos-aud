@@ -37,7 +37,8 @@ enum hda_ioctls {
     IOCTL_HDA_OUTPUT_GET_PRESENCE,
     IOCTL_HDA_OUTPUT_GET_INFO,
 
-    IOCTL_HDA_STREAM_PLAY = 272,
+    IOCTL_HDA_STREAM_SETUP,
+    IOCTL_HDA_STREAM_PLAY,
     IOCTL_HDA_STREAM_QUEUE_DATA,
     IOCTL_HDA_STREAM_CLEAR_QUEUE,
     IOCTL_HDA_STREAM_SHUTDOWN,
@@ -51,8 +52,7 @@ enum hda_ioctls {
     IOCTL_HDA_PATH_VOLUME,
     IOCTL_HDA_PATH_MUTE,
 
-    IOCTL_HDA_STREAM_SETUP_USER,
-    IOCTL_HDA_STREAM_SETUP = IOCTL_HDA_STREAM_SETUP_USER,
+    IOCTL_HDA_STREAM_SETUP_USER = IOCTL_HDA_STREAM_SETUP,
 };
 
 enum {
@@ -74,12 +74,11 @@ typedef struct stream_parameters {
     uint32_t channels;
     uint8_t format;
 } stream_parameters;
-typedef struct hda_stream_setup_user_parameters {
+typedef struct hda_stream_setup_parameters {
     stream_parameters stream_params;
     uint32_t ring_buffer_size;
-    /* Can be HANDLE_INVALID, and does not need to be a pipe */
-    handle ring_buffer_pipe; 
-} *hda_stream_setup_user_parameters;
+    void* buffer; // should be ring_buffer_size bytes in length
+} *hda_stream_setup_parameters;
 typedef const bool *hda_stream_play;
 typedef struct hda_path_find_parameters {
     bool same_stream;
