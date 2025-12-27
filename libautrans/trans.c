@@ -56,9 +56,23 @@ int autrans_transmit(int fd, aud_packet* pckt)
     if (pckt->payload_len)
         memcpy(hdr->payload, pckt->payload, pckt->payload_len);
 
-    int ret = TEMP_FAILURE_RETRY(send(fd, hdr, hdr->size, 0));
+    int nTransmitted = 0;
+    int nLeft = hdr->size;
+
+    while (nTransmitted != aud_hton32(hdr->size))
+    {
+        int ret = TEMP_FAILURE_RETRY(send(fd, ((char*)hdr) + nTransmitted, nLeft, 0));
+        if (ret < 0)
+        {
+            free(hdr);
+            return ret;
+        }
+        nTransmitted += ret;
+        nLeft -= ret;
+    }
+
     free(hdr);
-    return ret;
+    return nTransmitted;
 }
 
 int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len)
