@@ -54,6 +54,8 @@ obos_aud_connection* obos_aud_get_client_by_fd(int fd);
 
 void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_stream_set_flags(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_set_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_output_set_volume(obos_aud_connection* client, aud_packet* pckt);

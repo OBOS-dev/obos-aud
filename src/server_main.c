@@ -333,6 +333,12 @@ int main(int argc, char** argv)
                 case OBOS_AUD_DATA:
                     obos_aud_process_data(con, &curr->pckt);
                     break;
+                case OBOS_AUD_STREAM_SET_FLAGS:
+                    obos_aud_process_stream_set_flags(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_STREAM_GET_FLAGS:
+                    obos_aud_process_stream_get_flags(con, &curr->pckt);
+                    break;
 
                 case OBOS_AUD_STATUS_REPLY_OK:
                 case OBOS_AUD_STATUS_REPLY_UNSUPPORTED:
