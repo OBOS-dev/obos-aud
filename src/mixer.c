@@ -261,12 +261,23 @@ float mixer_output_get_volume(mixer_output_device* dev)
 
 float mixer_output_get_volume(mixer_output_device* dev);
 
+#ifdef __obos__
+#   include <obos/syscall.h>
+#endif
+
 static void* mixer_worker(void* arg)
 {
+#ifdef __obos__
+    uint32_t prio = 5; // REAL_TIME
+    syscall3(Sys_ThreadPriority, HANDLE_CURRENT, &prio, NULL);
+#endif
     mixer_output_device* dev = arg;
     size_t buffer_len = dev->sample_rate * dev->channels * sizeof(uint16_t);
     uint16_t* buffer = malloc(buffer_len);
     memset(buffer, 0x00, buffer_len);
+    float* condensed_samples = calloc(dev->channels, sizeof(float));
+    int input_channels = dev->input_channels;
+    float *samples = calloc(input_channels, sizeof(float));
     while (1)
     {
         pthread_mutex_lock(&dev->streams.lock);
@@ -284,9 +295,16 @@ static void* mixer_worker(void* arg)
         for (int i = 0; i < dev->sample_rate && dev->input_channels; i++)
         {
             pthread_mutex_lock(&dev->streams.lock);
-            int input_channels = dev->input_channels;
-            float *samples = calloc(input_channels, sizeof(float));
             int j = 0;
+            if (dev->input_channels != input_channels)
+            {
+                input_channels = dev->input_channels;
+                if (samples)
+                    free(samples);
+                samples = calloc(input_channels, sizeof(float));
+            }
+            else
+                memset(samples, 0, sizeof(*samples)*input_channels);
             for (aud_stream_node* node = dev->streams.head; node; node = node->next)
             {
                 up:
@@ -306,7 +324,9 @@ static void* mixer_worker(void* arg)
                 aud_stream_unlock(stream);
                 if (stream->sample_rate == dev->sample_rate)
                 {
-                    int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
+                    int16_t *i_samples = node->input_samples_arr ?
+                        node->input_samples_arr :
+                        (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
                     aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
@@ -331,7 +351,9 @@ static void* mixer_worker(void* arg)
                         node->last_output_idx = i; 
                         aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false, false);
                     }
-                    int16_t *i_samples = calloc(stream->channels, sizeof(int16_t));
+                    int16_t *i_samples = node->input_samples_arr ?
+                        node->input_samples_arr :
+                        (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
                     aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
@@ -377,7 +399,6 @@ static void* mixer_worker(void* arg)
                     buffer[i*dev->channels+c] = (int16_t)unnormalize(samples[c % input_channels], -0x10000, 0x10000);
             else
             {
-                float* condensed_samples = calloc(dev->channels, sizeof(float));
                 int samples_per_channel = input_channels / dev->channels;
                 int extra_samples = input_channels % dev->channels;
                 int additional_samples_per_channel = extra_samples / dev->channels;
@@ -399,13 +420,12 @@ static void* mixer_worker(void* arg)
                 }
                 for (int c = 0; c < dev->channels; c++)
                     buffer[i*dev->channels+c] = unnormalize(condensed_samples[c], -0x10000, 0x10000);
-                free(condensed_samples);
             }
             pthread_mutex_unlock(&dev->streams.lock);
-            free(samples);
         }
         aud_backend_queue_data(dev->info.output_id, buffer);
         memset(buffer, 0x00, buffer_len);
     }
+    free(samples);
     return NULL;
 }
