@@ -139,7 +139,7 @@ static int enumerate_outputs_dev(int idx)
     if (ret < 0)
         return ret;
 
-    uint32_t next_stream_idx = 0;
+    size_t next_stream_idx = 0;
 
     for (size_t codec = 0; codec < codec_count; codec++)
     {
@@ -172,7 +172,7 @@ static int enumerate_outputs_dev(int idx)
                 if (ret < 0)
                     return ret;
 
-                uint32_t stream_id = next_stream_idx++;
+                size_t stream_id = next_stream_idx++;
 
                 if (stream_id >= output_stream_count)
                 {
