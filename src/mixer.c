@@ -329,7 +329,6 @@ static void* mixer_worker(void* arg)
                     aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
-                    free(i_samples);
                     if (node->dead && !stream->ptr)
                     {
                         aud_stream_node* next = node->next;
@@ -347,7 +346,7 @@ static void* mixer_worker(void* arg)
                     */
                     if ((node->last_output_idx + (dev->sample_rate/stream->sample_rate)) == i)
                     {
-                        node->last_output_idx = i; 
+                        node->last_output_idx = i;
                         aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false, false);
                     }
                     int16_t *i_samples = node->input_samples_arr ?
@@ -356,7 +355,6 @@ static void* mixer_worker(void* arg)
                     aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true, false);
                     for (int i = 0; i < stream->channels; i++)
                         samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
-                    free(i_samples);
                     if (node->dead && !stream->ptr)
                     {
                         aud_stream_node* next = node->next;
