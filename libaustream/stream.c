@@ -73,7 +73,7 @@ void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
         while (len)
         {
             size_t nToWrite = len > stream->size ? stream->size : len;
-            aud_stream_push(stream, (const char*)data + (initial_len-len), nToWrite);
+            aud_stream_push_no_decode(stream, (const char*)data + (initial_len-len), nToWrite);
             len -= nToWrite;
         }
         return;
