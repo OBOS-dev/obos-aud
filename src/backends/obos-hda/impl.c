@@ -51,6 +51,8 @@ struct output {
         size_t len;
     } buffer;
 
+    bool selected;
+
     pthread_t processor_thread;
 };
 
@@ -71,6 +73,7 @@ static handle *s_devices;
 static pthread_mutex_t *s_mutexes;
 
 struct output* s_outputs;
+struct output* s_selected;
 
 static int select_output_dev(struct output* output);
 
@@ -262,6 +265,8 @@ int aud_backend_get_outputs(aud_output_dev* arr, int count)
 
 static int select_output_dev(struct output* output)
 {
+    if (output->selected)
+        return 0;
     int ret = ioctl(output->dev, IOCTL_HDA_CODEC_SELECT, &output->location.codec);
     if (ret < 0)
         return ret;
@@ -271,7 +276,14 @@ static int select_output_dev(struct output* output)
     ret = ioctl(output->dev, IOCTL_HDA_OUTPUT_GROUP_SELECT_OUTPUT, &output->location.output);
     if (ret < 0)
         return ret;
-    return ioctl(output->dev, IOCTL_HDA_OUTPUT_STREAM_SELECT, &output->location.output_stream);
+    ret = ioctl(output->dev, IOCTL_HDA_OUTPUT_STREAM_SELECT, &output->location.output_stream);
+    if (ret < 0)
+        return ret;
+    if (s_selected)
+        s_selected->selected = false;
+    s_selected = output;
+    output->selected = true;
+    return ret;
 }
 
 /* All streams are PCM */
