@@ -128,6 +128,8 @@ void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
 
 static int16_t read_sample(const int16_t* buffer, int channel, int channels, size_t buffer_len, float idx)
 {
+    if ((((int)idx)*channels + channel) >= (buffer_len / channels / sizeof(*buffer)))
+        return 0;
     return buffer[((int)idx)*channels + channel];
 }
 
