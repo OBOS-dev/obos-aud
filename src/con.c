@@ -356,6 +356,19 @@ void obos_aud_process_stream_set_flags(obos_aud_connection* client, aud_packet* 
         return;
     }
 
+    if (__builtin_popcount(payload->flags & OBOS_AUD_STREAM_DECODE_MASK) > 1)
+    {
+        aud_packet resp = {};
+        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
+        resp.client_id = client->client_id;
+        resp.payload = "Invalid flag combination.";
+        resp.payload_len = 26;
+        resp.transmission_id = pckt->transmission_id;
+        resp.transmission_id_valid = true;
+        autrans_transmit(client->fd, &resp);
+        return;
+    }
+    
     hnd->stream_node->data.flags = payload->flags & OBOS_AUD_STREAM_VALID_FLAG_MASK;
 
     aud_packet resp = {};

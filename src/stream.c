@@ -55,6 +55,42 @@ static int16_t ulaw_decode_table[256] = {
        120,    112,    104,     96,     88,     80,     72,     64,
         56,     48,     40,     32,     24,     16,      8,      0,
 };
+// source: bro i said just trust me..
+static int16_t alaw_decode_table[256] = {
+     -5504,      -5248,      -6016,      -5760,      -4480,      -4224,      -4992,      -4736,
+     -7552,      -7296,      -8064,      -7808,      -6528,      -6272,      -7040,      -6784,
+     -2752,      -2624,      -3008,      -2880,      -2240,      -2112,      -2496,      -2368,
+     -3776,      -3648,      -4032,      -3904,      -3264,      -3136,      -3520,      -3392,
+    -22016,     -20992,     -24064,     -23040,     -17920,     -16896,     -19968,     -18944,
+    -30208,     -29184,     -32256,     -31232,     -26112,     -25088,     -28160,     -27136,
+    -11008,     -10496,     -12032,     -11520,      -8960,      -8448,      -9984,      -9472,
+    -15104,     -14592,     -16128,     -15616,     -13056,     -12544,     -14080,     -13568,
+      -344,       -328,       -376,       -360,       -280,       -264,       -312,       -296,
+      -472,       -456,       -504,       -488,       -408,       -392,       -440,       -424,
+       -88,        -72,       -120,       -104,        -24,         -8,        -56,        -40,
+      -216,       -200,       -248,       -232,       -152,       -136,       -184,       -168,
+     -1376,      -1312,      -1504,      -1440,      -1120,      -1056,      -1248,      -1184,
+     -1888,      -1824,      -2016,      -1952,      -1632,      -1568,      -1760,      -1696,
+      -688,       -656,       -752,       -720,       -560,       -528,       -624,       -592,
+      -944,       -912,      -1008,       -976,       -816,       -784,       -880,       -848,
+      5504,       5248,       6016,       5760,       4480,       4224,       4992,       4736,
+      7552,       7296,       8064,       7808,       6528,       6272,       7040,       6784,
+      2752,       2624,       3008,       2880,       2240,       2112,       2496,       2368,
+      3776,       3648,       4032,       3904,       3264,       3136,       3520,       3392,
+     22016,      20992,      24064,      23040,      17920,      16896,      19968,      18944,
+     30208,      29184,      32256,      31232,      26112,      25088,      28160,      27136,
+     11008,      10496,      12032,      11520,       8960,       8448,       9984,       9472,
+     15104,      14592,      16128,      15616,      13056,      12544,      14080,      13568,
+       344,        328,        376,        360,        280,        264,        312,        296,
+       472,        456,        504,        488,        408,        392,        440,        424,
+        88,         72,        120,        104,         24,          8,         56,         40,
+       216,        200,        248,        232,        152,        136,        184,        168,
+      1376,       1312,       1504,       1440,       1120,       1056,       1248,       1184,
+      1888,       1824,       2016,       1952,       1632,       1568,       1760,       1696,
+       688,        656,        752,        720,        560,        528,        624,        592,
+       944,        912,       1008,        976,        816,        784,        880,        848,
+};
+
 
 void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_rate, int channels)
 {
@@ -96,17 +132,48 @@ static int16_t read_sample(const int16_t* buffer, int channel, int channels, siz
 }
 void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
 {
-    if (~stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE && stream->dev->sample_rate == stream->sample_rate)
+    if (((stream->flags & OBOS_AUD_STREAM_DECODE_MASK) == 0) && stream->dev->sample_rate == stream->sample_rate)
         return aud_stream_push_no_decode(stream, buf, len); // lol returning from a void function
     size_t newlen = len;
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
-        newlen *= sizeof(int16_t);
+        newlen /=  (8.f/16.f);
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_ALAW_DECODE)
+        newlen /=  (8.f/16.f);
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_PCM32_DECODE)
+        newlen /= (32.f/16.f);
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_PCM24_DECODE)
+        newlen /= (24.f/16.f);
     int16_t* decoded = malloc(newlen);
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
     {
         const int8_t* data = buf;
-        for (size_t i = 0; i < len; i++)
+        for (size_t i = 0; i < (len / sizeof(*data)); i++)
             decoded[i] = ulaw_decode_table[data[i]];
+    }
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_ALAW_DECODE)
+    {
+        const int8_t* data = buf;
+        for (size_t i = 0; i < (len / sizeof(*data)); i++)
+            decoded[i] = alaw_decode_table[data[i]];
+    }
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_PCM32_DECODE)
+    {
+        const int32_t* data = buf;
+
+        for (size_t i = 0; i < (len / sizeof(*data)); i++)
+            decoded[i] = (int16_t)(data[i] >> 16);
+    }
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_PCM24_DECODE)
+    {
+        struct int24
+        {
+            int32_t data : 24;
+        } PACK;
+
+        const struct int24* data = buf;
+
+        for (size_t i = 0; i < (len / sizeof(*data)); i++)
+            decoded[i] = (int16_t)(data[i].data >> 8);
     }
     else
         memcpy(decoded, buf, len);
