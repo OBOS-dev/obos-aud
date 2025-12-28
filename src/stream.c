@@ -10,7 +10,6 @@
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
@@ -68,7 +67,6 @@ void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_r
 
 void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
 {
-    printf("writing %zu decoded bytes to stream\n", len);
     while (stream->ptr > 0)
         sched_yield();
     if (len > (stream->size - stream->ptr))
