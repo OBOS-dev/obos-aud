@@ -154,13 +154,13 @@ void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
     int16_t* decoded = malloc(newlen);
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
     {
-        const int8_t* data = buf;
+        const uint8_t* data = buf;
         for (size_t i = 0; i < (len / sizeof(*data)); i++)
             decoded[i] = ulaw_decode_table[data[i]];
     }
     else if (stream->flags & OBOS_AUD_STREAM_FLAGS_ALAW_DECODE)
     {
-        const int8_t* data = buf;
+        const uint8_t* data = buf;
         for (size_t i = 0; i < (len / sizeof(*data)); i++)
             decoded[i] = alaw_decode_table[data[i]];
     }
