@@ -178,7 +178,8 @@ aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev, int sampl
         return NULL;
     aud_stream_node* node = calloc(1, sizeof(*node));
     pthread_mutex_lock(&dev->streams.lock);
-    aud_stream_initialize(&node->data, sample_rate, channels);
+    aud_stream_initialize(&node->data, sample_rate, dev->sample_rate, channels);
+    node->data.dev = dev;
     node->data.volume = mixer_normalize_volume(volume);
     node->owner = owner;
     if (!dev->streams.head)
@@ -321,75 +322,19 @@ static void* mixer_worker(void* arg)
                     continue;
                 }
                 aud_stream_unlock(stream);
-                if (stream->sample_rate == dev->sample_rate)
+                int16_t *i_samples = node->input_samples_arr ?
+                    node->input_samples_arr :
+                    (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
+                aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
+                for (int i = 0; i < stream->channels; i++)
+                    samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
+                if (node->dead && !stream->ptr)
                 {
-                    int16_t *i_samples = node->input_samples_arr ?
-                        node->input_samples_arr :
-                        (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
-                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
-                    for (int i = 0; i < stream->channels; i++)
-                        samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
-                    if (node->dead && !stream->ptr)
-                    {
-                        aud_stream_node* next = node->next;
-                        mixer_output_remove_stream_dev_unlocked(dev, node);
-                        node = next;
-                        goto up;
-                    }
-                    continue;
+                    aud_stream_node* next = node->next;
+                    mixer_output_remove_stream_dev_unlocked(dev, node);
+                    node = next;
+                    goto up;
                 }
-                else if (stream->sample_rate < dev->sample_rate)
-                {
-                    /*
-                        if one input sample = two output samples...
-                        then advance the stream every two output samples
-                    */
-                    if ((node->last_output_idx + (dev->sample_rate/stream->sample_rate)) == i)
-                    {
-                        node->last_output_idx = i;
-                        aud_stream_read(stream, NULL, stream->channels*sizeof(int16_t), false, false);
-                    }
-                    int16_t *i_samples = node->input_samples_arr ?
-                        node->input_samples_arr :
-                        (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
-                    aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), true, false);
-                    for (int i = 0; i < stream->channels; i++)
-                        samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
-                    if (node->dead && !stream->ptr)
-                    {
-                        aud_stream_node* next = node->next;
-                        mixer_output_remove_stream_dev_unlocked(dev, node);
-                        node = next;
-                        goto up;
-                    }
-                }
-                else
-                {
-                    int sample_count = node->sample_count ? 
-                        node->sample_count : 
-                        (node->sample_count = stream->sample_rate / dev->sample_rate);
-                    int16_t *input_samples = node->input_samples_arr ?
-                        node->input_samples_arr :
-                        (node->input_samples_arr = calloc(sample_count * stream->channels, sizeof(int16_t)));
-
-                    aud_stream_read(stream, input_samples, sample_count*sizeof(int16_t), false, false);
-                    for (int c = 0; c < stream->channels; c++)
-                    {
-                        for (int s_idx = 0; s_idx < sample_count; s_idx++)
-                            samples[j] += input_samples[s_idx + c * stream->channels];
-                        samples[j++] /= sample_count;
-                        samples[j-1] = normalize(samples[j-1], -0x10000, 0x10000) * volume;
-                    }
-                    if (node->dead && !stream->ptr)
-                    {
-                        aud_stream_node* next = node->next;
-                        mixer_output_remove_stream_dev_unlocked(dev, node);
-                        node = next;
-                        goto up;
-                    }
-                }
-                if (i == (dev->sample_rate-1))
-                    node->last_output_idx = 0;
             }
             if (input_channels <= dev->channels)
                 for (int c = 0; c < dev->channels && input_channels != 0; c++)

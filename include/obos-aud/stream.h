@@ -29,9 +29,10 @@ typedef struct aud_stream {
     int channels;
     float volume;
     uint32_t flags;
+    struct mixer_output_device* dev;
 } aud_stream;
 
-void aud_stream_initialize(aud_stream* stream, int sample_rate, int channels);
+void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_rate, int channels);
 void aud_stream_push(aud_stream* stream, const void* data, size_t len);
 void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len);
 bool aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek, bool blocking);
