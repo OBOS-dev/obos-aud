@@ -130,6 +130,12 @@ static int16_t read_sample(const int16_t* buffer, int channel, int channels, siz
 {
     return buffer[((int)idx)*channels + channel];
 }
+
+static float clamp(float value, float min, float max)
+{
+    return value < min ? min : ((value > max) ? max : value);
+}
+
 void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
 {
     if (((stream->flags & OBOS_AUD_STREAM_DECODE_MASK) == 0) && stream->dev->sample_rate == stream->sample_rate)
@@ -143,6 +149,8 @@ void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
         newlen /= (32.f/16.f);
     else if (stream->flags & OBOS_AUD_STREAM_FLAGS_PCM24_DECODE)
         newlen /= (24.f/16.f);
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_F32_DECODE)
+        newlen /= (32.f/16.f);
     int16_t* decoded = malloc(newlen);
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
     {
@@ -174,6 +182,13 @@ void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
 
         for (size_t i = 0; i < (len / sizeof(*data)); i++)
             decoded[i] = (int16_t)(data[i].data >> 8);
+    }
+    else if (stream->flags & OBOS_AUD_STREAM_FLAGS_F32_DECODE)
+    {
+        const float* data = buf;
+
+        for (size_t i = 0; i < (len / sizeof(*data)); i++)
+            decoded[i] = (int16_t)(clamp(data[i], -1, 1) * 32767);
     }
     else
         memcpy(decoded, buf, len);
