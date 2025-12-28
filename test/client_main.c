@@ -21,7 +21,7 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 
-const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-u] input_file\n";
+const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-f format] input_file\n";
 
 static int stream_set_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t flags)
 {
@@ -108,6 +108,24 @@ static int stream_set_flags(int socket, uint32_t client_id, uint16_t stream_id, 
 
 }
 
+static int get_format(const char* fmt)
+{
+    int res = -1;
+    if (strcasecmp(fmt, "pcm32") == 0)
+        res = OBOS_AUD_STREAM_FLAGS_PCM32_DECODE;
+    else if (strcasecmp(fmt, "pcm24") == 0)
+        res = OBOS_AUD_STREAM_FLAGS_PCM24_DECODE;
+    else if (strcasecmp(fmt, "ulaw") == 0)
+        res = OBOS_AUD_STREAM_FLAGS_ULAW_DECODE;
+    else if (strcasecmp(fmt, "alaw") == 0)
+        res = OBOS_AUD_STREAM_FLAGS_ALAW_DECODE;
+    else if (strcasecmp(fmt, "f32") == 0)
+        res = OBOS_AUD_STREAM_FLAGS_F32_DECODE;
+    else if (strcasecmp(fmt, "pcm16") == 0)
+        res = 0;
+    return res;
+}
+
 int main(int argc, char** argv)
 {
     int opt = 0;
@@ -116,9 +134,9 @@ int main(int argc, char** argv)
     int channels = 2;
     int sample_rate = 44100;
     float volume = 100.f;
-    bool ulaw = false;
+    int format_flags = 0;
 
-    while ((opt = getopt(argc, argv, "+hs:c:v:d:u")) != -1)
+    while ((opt = getopt(argc, argv, "+hs:c:v:d:f:")) != -1)
     {
         switch (opt)
         {
@@ -152,8 +170,13 @@ int main(int argc, char** argv)
                     return -1;
                 }
                 break;
-            case 'u':
-                ulaw = true;
+            case 'f':
+                format_flags = get_format(optarg);
+                if (format_flags == -1)
+                {
+                    fprintf(stderr, "Expected: f32, pcm32, pcm24, pcm16, ulaw, or alaw, got \"%s\".\n", optarg);
+                    return -1;
+                }
                 break;
             case 'h':
             default:
@@ -279,6 +302,7 @@ int main(int argc, char** argv)
     else if (channels > 2)
         printf("Opening stream with %d channels at %dhz\n", channels, sample_rate);
 
+    int stream_flags = 0;
     aud_open_stream_payload stream_info = {};
     stream_info.input_channels = channels;
     stream_info.target_sample_rate = sample_rate;
@@ -336,17 +360,31 @@ int main(int argc, char** argv)
         free(reply.payload);
     goto die;
     } while(0);
-    if (ulaw)
+    int sample_size = 2;
+    if (format_flags)
     {
-        int res = stream_set_flags(socket, client_id, stream, OBOS_AUD_STREAM_FLAGS_ULAW_DECODE);
+        int res = stream_set_flags(socket, client_id, stream, stream_flags|format_flags);
         if (res < 0)
         {
             fprintf(stderr, "mu-law not supported by server!\n");
             goto die;
         }
+        switch (format_flags) {
+            case OBOS_AUD_STREAM_FLAGS_ALAW_DECODE:
+            case OBOS_AUD_STREAM_FLAGS_ULAW_DECODE:
+                sample_size = 1;
+                break;
+            case OBOS_AUD_STREAM_FLAGS_F32_DECODE:
+            case OBOS_AUD_STREAM_FLAGS_PCM32_DECODE:
+                sample_size = 4;
+                break;
+            case OBOS_AUD_STREAM_FLAGS_PCM24_DECODE:
+                sample_size = 3;
+                break;
+        }
     }
 
-    size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * (ulaw ? sizeof(uint8_t) : sizeof(int16_t));
+    size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * (sample_size);
     aud_data_payload *payload = malloc(buffer_size+sizeof(aud_data_payload));
     payload->stream_id = stream;
     size_t avail = 0;
