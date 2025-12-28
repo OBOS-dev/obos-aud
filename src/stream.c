@@ -129,7 +129,6 @@ void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
                     float osamples_per_isample = 1/isamples_per_osample;
                     for (float j = 0; j < osamples_per_isample; j++)
                         final_sample += read_sample(decoded, channel, stream->channels, newlen, i+j);
-                    final_sample /= osamples_per_isample;
                 }
                 new_buf[(int)(i / isamples_per_osample)*stream->channels + channel] = final_sample;
             }
