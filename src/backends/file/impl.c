@@ -126,7 +126,7 @@ int aud_backend_query_output_params(int output_id, int *sample_rate, int *channe
     return 0;
 }
 
-int aud_backend_queue_data(int output_id, const void* buf)
+int aud_backend_queue_data(int output_id, const void* buf, double frame_time)
 {
     if (!s_sample_rate)
         return -1;

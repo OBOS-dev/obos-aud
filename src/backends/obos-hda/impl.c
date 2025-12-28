@@ -20,6 +20,7 @@
 #include <string.h>
 #include <errno.h>
 #include <pthread.h>
+#include <math.h>
 
 #include <sys/ioctl.h>
 #include <sys/param.h>
@@ -48,6 +49,8 @@ struct output {
     bool selected;
 
     void* buffer;
+    size_t buffer_ptr;
+    size_t buffer_len;
 
     pthread_t processor_thread;
 };
@@ -73,21 +76,15 @@ struct output* s_selected;
 
 static int select_output_dev(struct output* output);
 
-static void push_audio(struct output* output, const void* buffer, size_t size)
+static void push_audio(struct output* output, const void* buffer, size_t size, double frame_time)
 {
-    memcpy(output->buffer, buffer, size);
-    // sleep(1);
-    syscall1(Sys_SleepMS, 980);
-
-    // pthread_mutex_lock(&s_mutexes[output->dev_idx]);
-    // int ret = select_output_dev(output);
-    // if (ret < 0)
-    //     pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
-
-
-    // ioctl(output->dev, IOCTL_HDA_STREAM_QUEUE_DATA);
-    // ret = write(output->dev, buffer, size);
-    // pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
+    int sleep_time = 1000 - ceil(frame_time * 1000) - 5;
+    if (sleep_time > 0)
+        syscall1(Sys_SleepMS, sleep_time);
+    memcpy(output->buffer + output->buffer_ptr, buffer, size);
+    output->buffer_ptr += size;
+    if (output->buffer_ptr == output->buffer_len)
+        output->buffer_ptr = 0;
 }
 
 static int enumerate_outputs_dev(int idx)
@@ -300,13 +297,15 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
         
     struct hda_stream_setup_parameters stream_setup = {};
     stream_setup.stream_params = path_setup.stream_parameters;
-    stream_setup.ring_buffer_size = sample_rate * channels * (format_size/8);
+    stream_setup.ring_buffer_size = sample_rate * channels * (format_size/8) * 1;
+    output->buffer_len = stream_setup.ring_buffer_size;
     stream_setup.buffer = output->buffer = calloc(stream_setup.ring_buffer_size, sizeof(uint8_t));
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_CLEAR_QUEUE, NULL);
     if (ret < 0)
     {
         free(output->buffer);
         output->buffer = NULL;
+        output->buffer_len = 0;
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -316,6 +315,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     {
         free(output->buffer);
         output->buffer = NULL;
+        output->buffer_len = 0;
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -325,6 +325,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     {
         free(output->buffer);
         output->buffer = NULL;
+        output->buffer_len = 0;
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -354,7 +355,7 @@ int aud_backend_query_output_params(int output_id, int *sample_rate, int *channe
     return 0;
 }
 
-int aud_backend_queue_data(int output_id, const void* buffer)
+int aud_backend_queue_data(int output_id, const void* buffer, double frame_time)
 {
     if ((output_id-1) >= s_output_count)
     {
@@ -364,7 +365,7 @@ int aud_backend_queue_data(int output_id, const void* buffer)
 
     struct output* output = &s_outputs[output_id-1];
 
-    push_audio(output, buffer, (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8)));
+    push_audio(output, buffer, (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8)), frame_time);
 
     // pthread_mutex_lock(&output->buffer_lock);
     // size_t new_len = output->buffer.len + (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8));

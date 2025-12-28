@@ -292,6 +292,8 @@ static void* mixer_worker(void* arg)
         }
         pthread_mutex_unlock(&dev->streams.lock);
         aud_backend_output_play(dev->info.output_id, true);
+        struct timespec start = {};
+        clock_gettime(1, &start);
         for (int i = 0; i < dev->sample_rate && dev->input_channels; i++)
         {
             pthread_mutex_lock(&dev->streams.lock);
@@ -366,7 +368,10 @@ static void* mixer_worker(void* arg)
             }
             pthread_mutex_unlock(&dev->streams.lock);
         }
-        aud_backend_queue_data(dev->info.output_id, buffer);
+        struct timespec end = {};
+        clock_gettime(1, &end);
+        double frame_time = (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+        aud_backend_queue_data(dev->info.output_id, buffer, frame_time);
         memset(buffer, 0x00, buffer_len);
     }
     free(samples);
