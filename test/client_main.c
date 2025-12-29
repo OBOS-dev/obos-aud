@@ -21,7 +21,7 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 
-const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-f format] input_file\n";
+const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-f format] [-o output_id] input_file\n";
 
 static int stream_set_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t flags)
 {
@@ -135,8 +135,9 @@ int main(int argc, char** argv)
     int sample_rate = 44100;
     float volume = 100.f;
     int format_flags = 0;
+    uint16_t output = OBOS_AUD_DEFAULT_OUTPUT_DEV;
 
-    while ((opt = getopt(argc, argv, "+hs:c:v:d:f:")) != -1)
+    while ((opt = getopt(argc, argv, "+hs:c:v:d:f:o:")) != -1)
     {
         switch (opt)
         {
@@ -149,6 +150,15 @@ int main(int argc, char** argv)
                 if (errno != 0 || channels <= 0)
                 {
                     fprintf(stderr, "Expected positive non-zero integer, got %s\n", optarg);
+                    return -1;
+                }
+                break;
+            case 'o':
+                errno = 0;
+                output = strtol(optarg, NULL, 0);
+                if (errno != 0)
+                {
+                    fprintf(stderr, "Expected integer, got %s\n", optarg);
                     return -1;
                 }
                 break;
@@ -245,7 +255,6 @@ int main(int argc, char** argv)
 
     free(reply.payload);
 
-    uint16_t output = OBOS_AUD_DEFAULT_OUTPUT_DEV;
     uint16_t stream = 0;
     aud_output_dev output_info = {};
     do {
@@ -283,12 +292,12 @@ int main(int argc, char** argv)
 
         if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
         {
-            fprintf(stderr, "While querying default output: %s\n", autrans_opcode_to_string(reply.opcode));
+            fprintf(stderr, "While querying output device: %s\n", autrans_opcode_to_string(reply.opcode));
             if (reply.payload_len)
                 fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
         }
         else
-            fprintf(stderr, "While querying default output: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+            fprintf(stderr, "While querying output device: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
         free(reply.payload);
         goto die;
     } while(0);
