@@ -98,7 +98,7 @@ void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_r
     stream->write_event = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
     stream->sample_rate = sample_rate;
     stream->channels = channels;
-    stream->size = sizeof(int16_t)*dev_sample_rate*channels;
+    stream->size = sizeof(int16_t)*dev_sample_rate*channels*10;
     stream->buffer = malloc(stream->size);
 }
 

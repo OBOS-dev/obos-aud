@@ -343,7 +343,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     struct hda_stream_setup_user_parameters stream_setup = {};
     stream_setup.stream_params = path_setup.stream_parameters;
     stream_setup.ring_buffer_pipe = HANDLE_INVALID;
-    stream_setup.ring_buffer_size = sample_rate * channels * (format_size/8);
+    stream_setup.ring_buffer_size = sample_rate * channels * (format_size/8) * 10;
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_CLEAR_QUEUE, NULL);
     if (ret < 0)
     {
@@ -390,7 +390,7 @@ int aud_backend_query_output_params(int output_id, int *sample_rate, int *channe
     return 0;
 }
 
-int aud_backend_queue_data(int output_id, const void* buffer)
+int aud_backend_queue_data(int output_id, const void* buffer, int len)
 {
     if ((output_id-1) >= s_output_count)
     {
@@ -400,7 +400,7 @@ int aud_backend_queue_data(int output_id, const void* buffer)
 
     struct output* output = &s_outputs[output_id-1];
 
-    push_audio(output, buffer, (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8)));
+    push_audio(output, buffer, len);
 
     // pthread_mutex_lock(&output->buffer_lock);
     // size_t new_len = output->buffer.len + (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8));

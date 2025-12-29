@@ -272,7 +272,7 @@ static void* mixer_worker(void* arg)
     syscall3(Sys_ThreadPriority, HANDLE_CURRENT, &prio, NULL);
 #endif
     mixer_output_device* dev = arg;
-    size_t buffer_len = dev->sample_rate * dev->channels * sizeof(uint16_t);
+    size_t buffer_len = (dev->sample_rate*10) * dev->channels * sizeof(uint16_t);
     uint16_t* buffer = malloc(buffer_len);
     memset(buffer, 0x00, buffer_len);
     float* condensed_samples = calloc(dev->channels, sizeof(float));
@@ -294,7 +294,7 @@ static void* mixer_worker(void* arg)
         aud_backend_output_play(dev->info.output_id, true);
         // struct timespec start = {};
         // clock_gettime(1, &start);
-        for (int i = 0; i < dev->sample_rate && dev->input_channels; i++)
+        for (int i = 0; i < (buffer_len/dev->channels/sizeof(*buffer)) && dev->input_channels; i++)
         {
             pthread_mutex_lock(&dev->streams.lock);
             int j = 0;
