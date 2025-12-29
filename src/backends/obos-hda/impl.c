@@ -355,7 +355,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
         return ret;
     }
 
-    ret = ioctl(output->dev, IOCTL_HDA_STREAM_SETUP_USER, &stream_setup);
+    ret = ioctl(output->dev, IOCTL_HDA_STREAM_SETUP, &stream_setup);
     if (ret < 0)
     {
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
