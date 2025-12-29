@@ -421,6 +421,9 @@ int aud_backend_output_play(int output_id, bool play)
     
     struct output* output = &s_outputs[output_id-1];
 
+    if (output->is_playing == play)
+        return 0;
+
     pthread_mutex_lock(&output->playing_mut);
     output->is_playing = play;
     if (output->is_playing)

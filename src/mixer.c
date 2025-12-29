@@ -268,7 +268,7 @@ float mixer_output_get_volume(mixer_output_device* dev);
 static void* mixer_worker(void* arg)
 {
 #ifdef __obos__
-    uint32_t prio = 5; // REAL_TIME
+    uint32_t prio = 4; // URGENT
     syscall3(Sys_ThreadPriority, HANDLE_CURRENT, &prio, NULL);
 #endif
     mixer_output_device* dev = arg;
