@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
@@ -31,7 +32,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 
-static const char* const usage = "%s [-l connection_mode] [-n connection_mode] [-a address] [-m unix_socket_mode]\n'connection_mode' can be either tcp or unix.\n";
+static const char* const usage = "%s [-l connection_mode] [-n connection_mode] [-a address] [-m unix_socket_mode] [-d] [-q]\n'connection_mode' can be either tcp or unix.\n";
 
 struct packet_node {
     aud_packet pckt;
@@ -68,8 +69,10 @@ int main(int argc, char** argv)
     bool tcp_listen = true;
     bool unix_listen = true;
     int unix_socket_mode = 0777;
+    bool daemonize = false;
+    bool quiet = false;
 
-    while ((opt = getopt(argc, argv, "hl:n:m:a")) != -1)
+    while ((opt = getopt(argc, argv, "hl:n:m:aqd")) != -1)
     {
         switch (opt)
         {
@@ -114,11 +117,29 @@ int main(int argc, char** argv)
                 }
                 break;
             }
+            case 'd': daemonize = true; break;
+            case 'q': quiet = true; break;
             case 'h':
             default:
                 fprintf(stderr, usage, argv[0]);
                 return opt != 'h';
         }
+    }
+
+    if (daemonize)
+        daemon(0, !quiet);
+    else if (quiet)
+    {
+        close(0);
+        close(1);
+        close(2);
+        int null = open("/dev/null", O_WRONLY);
+        dup2(null, 1);
+        dup2(null, 2);
+        close(null);
+        null = open("/dev/null", O_RDONLY);
+        dup2(null, 0);
+        close(null);
     }
 
     mixer_initialize();
