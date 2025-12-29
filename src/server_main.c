@@ -264,6 +264,8 @@ int main(int argc, char** argv)
                 }
                 else if (!(node = receive_packet(fds[i].fd)))
                 {
+                    obos_aud_connection* con = obos_aud_get_client_by_fd(fds[i].fd);
+                    obos_aud_process_disconnect(con, NULL);
                     close(fds[i].fd);
                     shutdown(fds[i].fd, SHUT_RDWR);
                     if (i != (nToPoll - 1))
