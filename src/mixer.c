@@ -371,7 +371,7 @@ static void* mixer_worker(void* arg)
         // struct timespec end = {};
         // clock_gettime(1, &end);
         // double frame_time = (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-        aud_backend_queue_data(dev->info.output_id, buffer);
+        aud_backend_queue_data(dev->info.output_id, buffer, buffer_len);
         memset(buffer, 0x00, buffer_len);
     }
     free(samples);

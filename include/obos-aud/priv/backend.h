@@ -25,7 +25,6 @@ WEAK int aud_backend_get_outputs(aud_output_dev* arr, int count);
 /* All streams are PCM */
 WEAK int aud_backend_configure_output(int output_id, int sample_rate, int channels, int format_size);
 WEAK int aud_backend_query_output_params(int output_id, int *sample_rate, int *channels, int *format_size);
-/* The memory at buf is assumed to be sample_rate*channels*format_size_bytes in length. */
-WEAK int aud_backend_queue_data(int output_id, const void* buf);
+WEAK int aud_backend_queue_data(int output_id, const void* buf, int len);
 WEAK int aud_backend_output_play(int output_id, bool play);
 WEAK int aud_backend_set_output_volume(int output_id, float volume /* out of 100 */);

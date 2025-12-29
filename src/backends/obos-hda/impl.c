@@ -54,6 +54,8 @@ struct output {
 
     bool selected;
 
+    int pipe;
+
     pthread_t processor_thread;
 };
 
@@ -80,22 +82,7 @@ static int select_output_dev(struct output* output);
 
 static void push_audio(struct output* output, const void* buffer, size_t size)
 {
-    pthread_mutex_lock(&s_mutexes[output->dev_idx]);
-    int ret = select_output_dev(output);
-    if (ret < 0)
-    {
-        pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
-        return;
-    }
-
-    // int remaining = 0;
-    // do {
-    //     ioctl(output->dev, IOCTL_HDA_STREAM_GET_REMAINING, &remaining);
-    // } while (remaining != 0);
-
-    ioctl(output->dev, IOCTL_HDA_STREAM_QUEUE_DATA);
-    ret = write(output->dev, buffer, size);
-    pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
+    write(output->pipe, buffer, size);
 }
 
 static void* process_audio(void* arg)
@@ -339,14 +326,28 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
         errno = EOPNOTSUPP;
         return -1;
     }
-        
+
+    int pipes[2] = {};
+    ret = pipe(pipes);
+    if (ret < 0)
+    {
+        pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
+        return ret;
+    }
+    
+    output->pipe = pipes[1];
     struct hda_stream_setup_user_parameters stream_setup = {};
     stream_setup.stream_params = path_setup.stream_parameters;
-    stream_setup.ring_buffer_pipe = HANDLE_INVALID;
+    stream_setup.ring_buffer_pipe = pipes[0];
     stream_setup.ring_buffer_size = sample_rate * channels * (format_size/8);
+    
+    fcntl(pipes[0], F_SETPIPE_SZ, stream_setup.ring_buffer_size);
+
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_CLEAR_QUEUE, NULL);
     if (ret < 0)
     {
+        close(pipes[0]);
+        close(pipes[1]);
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -354,6 +355,8 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_SHUTDOWN, NULL);
     if (ret < 0)
     {
+        close(pipes[0]);
+        close(pipes[1]);
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -361,6 +364,8 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_SETUP_USER, &stream_setup);
     if (ret < 0)
     {
+        close(pipes[0]);
+        close(pipes[1]);
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
         return ret;
     }
@@ -390,7 +395,7 @@ int aud_backend_query_output_params(int output_id, int *sample_rate, int *channe
     return 0;
 }
 
-int aud_backend_queue_data(int output_id, const void* buffer)
+int aud_backend_queue_data(int output_id, const void* buffer, int len)
 {
     if ((output_id-1) >= s_output_count)
     {
@@ -400,7 +405,7 @@ int aud_backend_queue_data(int output_id, const void* buffer)
 
     struct output* output = &s_outputs[output_id-1];
 
-    push_audio(output, buffer, (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8)));
+    push_audio(output, buffer, len);
 
     // pthread_mutex_lock(&output->buffer_lock);
     // size_t new_len = output->buffer.len + (output->stream_parameters.sample_rate*output->stream_parameters.channels*(output->format_size/8));

@@ -126,13 +126,13 @@ int aud_backend_query_output_params(int output_id, int *sample_rate, int *channe
     return 0;
 }
 
-int aud_backend_queue_data(int output_id, const void* buf)
+int aud_backend_queue_data(int output_id, const void* buf, int len)
 {
     if (!s_sample_rate)
         return -1;
 
     pthread_mutex_lock(&s_buffer_lock);
-    size_t new_len = s_buffer.len + (s_sample_rate*s_channels*(s_format_size/8));
+    size_t new_len = s_buffer.len + len;
     s_buffer.buf = realloc(s_buffer.buf, new_len);
     memcpy(s_buffer.buf+s_buffer.len, buf, new_len - s_buffer.len);
     s_buffer.len = new_len;
