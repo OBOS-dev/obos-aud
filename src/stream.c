@@ -95,6 +95,7 @@ static int16_t alaw_decode_table[256] = {
 void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_rate, int channels)
 {
     stream->mut = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    stream->write_event = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
     stream->sample_rate = sample_rate;
     stream->channels = channels;
     stream->size = sizeof(int16_t)*dev_sample_rate*channels;
@@ -103,10 +104,12 @@ void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_r
 
 void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
 {
-    while (stream->ptr > 0)
-        sched_yield();
     if (len > (stream->size - stream->ptr))
     {
+        pthread_mutex_lock(&stream->mut);
+        while (stream->ptr > 0)
+            pthread_cond_wait(&stream->write_event, &stream->mut);
+        pthread_mutex_unlock(&stream->mut);
         size_t initial_len = len;
         while (len)
         {
@@ -116,11 +119,9 @@ void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
         }
         return;
     }
-    up:
+    pthread_mutex_lock(&stream->mut);
     while (stream->ptr == stream->size)
-        sched_yield();
-    if (pthread_mutex_trylock(&stream->mut) == EBUSY)
-        goto up;
+        pthread_cond_wait(&stream->write_event, &stream->mut);
     memcpy((char*)stream->buffer + stream->ptr, data, len);
     stream->ptr += len;
     pthread_mutex_unlock(&stream->mut);
@@ -245,7 +246,10 @@ bool aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek, bool
     {
         stream->in_ptr += len;
         if (stream->in_ptr == stream->ptr)
+        {
             stream->in_ptr = stream->ptr = 0;
+            pthread_cond_signal(&stream->write_event);
+        }
     }
     aud_stream_unlock(stream);
     return true;

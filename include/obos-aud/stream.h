@@ -30,6 +30,7 @@ typedef struct aud_stream {
     size_t in_ptr;
     size_t size;
     pthread_mutex_t mut;
+    pthread_cond_t write_event; /* only set when the stream is empty! */
     int sample_rate;
     int channels;
     float volume;

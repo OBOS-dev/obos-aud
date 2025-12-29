@@ -83,12 +83,15 @@ static void push_audio(struct output* output, const void* buffer, size_t size)
     pthread_mutex_lock(&s_mutexes[output->dev_idx]);
     int ret = select_output_dev(output);
     if (ret < 0)
+    {
         pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
+        return;
+    }
 
-    int remaining = 0;
-    do {
-        ioctl(output->dev, IOCTL_HDA_STREAM_GET_REMAINING, &remaining);
-    } while (remaining != 0);
+    // int remaining = 0;
+    // do {
+    //     ioctl(output->dev, IOCTL_HDA_STREAM_GET_REMAINING, &remaining);
+    // } while (remaining != 0);
 
     ioctl(output->dev, IOCTL_HDA_STREAM_QUEUE_DATA);
     ret = write(output->dev, buffer, size);
@@ -180,7 +183,7 @@ static int enumerate_outputs_dev(int idx)
 
                 if (stream_id >= output_stream_count)
                 {
-                    printf("obos-hda: Ran out of output streams!\n");
+                    printf("obos-hda: Ran out of output streams (stream_id=%zu, output_id=%zu)!\n", stream_id, s_output_count);
                     codec = codec_count;
                     output_group = output_group_count;
                     break;
