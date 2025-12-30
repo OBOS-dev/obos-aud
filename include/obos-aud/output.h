@@ -48,6 +48,21 @@ enum aud_output_color {
 	OBOS_AUD_OUTPUT_COLOR_OTHER = 15
 };
 
+static const char* aud_output_color_to_str[] = {
+	"unknown",
+	"black",
+	"grey",
+	"blue",
+	"green",
+	"red",
+	"orange",
+	"yellow",
+	"purple",
+	"pink",
+	[14]="white",
+	"other",
+};
+
 enum aud_output_location {
 	OBOS_AUD_OUTPUT_LOCATION_NA = 0,
 	OBOS_AUD_OUTPUT_LOCATION_REAR = 1,
@@ -65,6 +80,25 @@ enum aud_output_location {
 	OBOS_AUD_OUTPUT_LOCATION_INSIDE_LID,
 	OBOS_AUD_OUTPUT_LOCATION_OUTSIDE_LID,
 	OBOS_AUD_OUTPUT_LOCATION_UNKNOWN
+};
+
+static const char* aud_output_location_to_str[] = {
+	"N/A",
+	"rear",
+	"front",
+	"left",
+	"right",
+	"top",
+	"bottom",
+	"special",
+	"rear panel",
+	"drive bay",
+	"riser",
+	"display",
+	"ATAPI",
+	"inside lid",
+	"outside lid",
+	"unknown",
 };
 
 enum aud_flags {
