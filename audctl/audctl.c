@@ -162,7 +162,7 @@ int main(int argc, char** argv)
         volume = strtof(command_argv[command_argc == 2 ? 1 : 0], NULL);
         if (errno != 0 || volume < 0)
         {
-            fprintf(stderr, "Expected floating point integer, got %s\n", command_argv[0]);
+            fprintf(stderr, "Expected floating point integer, got %s\n", command_argv[command_argc == 2 ? 1 : 0]);
             goto die;
         }
 
@@ -188,7 +188,7 @@ int main(int argc, char** argv)
         volume = strtof(command_argv[command_argc == 2 ? 1 : 0], NULL);
         if (errno != 0 || volume < 0)
         {
-            fprintf(stderr, "Expected floating point integer, got %s\n", command_argv[0]);
+            fprintf(stderr, "Expected floating point integer, got %s\n", command_argv[command_argc == 2 ? 1 : 0]);
             goto die;
         }
 
@@ -320,6 +320,82 @@ int main(int argc, char** argv)
         printf("  source channels: %d%s\n", reply.input_channels, reply.input_channels ? "" : " (idle)");
         printf("  buffer size (samples): %d\n", reply.buffer_samples);
         printf("  buffer size (seconds): %f\n", reply.buffer_samples / (float)reply.params.channels / (float)reply.params.sample_rate);
+    }
+    else if (strcasecmp(command, "output-set-buffer-size-samples") == 0)
+    {
+        if (command_argc < 1)
+        {
+            fprintf(stderr, "output-set-buffer-size-samples [output_id] volume\n");
+            goto die;
+        }
+        uint16_t output_id = OBOS_AUD_DEFAULT_OUTPUT_DEV;
+        int32_t samples = 0;
+        if (command_argc == 2)
+        {
+            errno = 0;
+            output_id = strtoul(command_argv[0], NULL, 0);
+            if (errno != 0)
+            {
+                fprintf(stderr, "Expected unsigned integer, got %s\n", command_argv[0]);
+                goto die;
+            }
+        }
+        errno = 0;
+        samples = strtol(command_argv[command_argc == 2 ? 1 : 0], NULL, 0);
+        if (errno != 0 || samples <= 0)
+        {
+            fprintf(stderr, "Expected integer greater than zero, got %s\n", command_argv[command_argc == 2 ? 1 : 0]);
+            goto die;
+        }
+
+        aud_query_output_parameters_reply reply = {};
+        if (autrans_query_output_parameters(socket, client_id, output_id, &reply) < 0)
+            goto die;
+
+        if (autrans_output_set_buffer_samples(socket, client_id, output_id, samples) < 0)
+            goto die;
+
+        printf("set buffer size to %d sample%c (%f seconds)\n", samples, samples != 1 ? 's' : '\0', samples / (float)reply.params.channels / (float)reply.params.sample_rate);
+    }
+    else if (strcasecmp(command, "output-set-buffer-size-seconds") == 0)
+    {
+        if (command_argc < 1)
+        {
+            fprintf(stderr, "output-set-buffer-size-seconds [output_id] seconds\n");
+            goto die;
+        }
+        uint16_t output_id = OBOS_AUD_DEFAULT_OUTPUT_DEV;
+        float time = 0;
+        if (command_argc == 2)
+        {
+            errno = 0;
+            output_id = strtoul(command_argv[0], NULL, 0);
+            if (errno != 0)
+            {
+                fprintf(stderr, "Expected unsigned integer, got %s\n", command_argv[0]);
+                goto die;
+            }
+        }
+        errno = 0;
+        time = strtof(command_argv[command_argc == 2 ? 1 : 0], NULL);
+        if (errno != 0 || time <= 0)
+        {
+            fprintf(stderr, "Expected floating point integer greater than zero, got %s\n", command_argv[command_argc == 2 ? 1 : 0]);
+            goto die;
+        }
+
+        aud_query_output_parameters_reply reply = {};
+        if (autrans_query_output_parameters(socket, client_id, output_id, &reply) < 0)
+            goto die;
+
+        int samples = time * (float)reply.params.channels * (float)reply.params.sample_rate;
+        if (!samples)
+            samples = 1;
+
+        if (autrans_output_set_buffer_samples(socket, client_id, output_id, samples) < 0)
+            goto die;
+
+        printf("set buffer size to %d sample%c (%f seconds)\n", samples, samples != 1 ? 's' : '\0', time);
     }
     else
     {
