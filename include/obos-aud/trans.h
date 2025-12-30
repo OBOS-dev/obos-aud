@@ -39,6 +39,7 @@ enum aud_opcode {
     OBOS_AUD_STREAM_GET_FLAGS,
     OBOS_AUD_SET_NAME, /* sets the user-readable name of the current connection */
     OBOS_AUD_QUERY_CONNECTIONS,
+    OBOS_AUD_QUERY_OUTPUT_PARAMETERS,
 
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
@@ -47,6 +48,7 @@ enum aud_opcode {
     OBOS_AUD_GET_VOLUME_REPLY,
     OBOS_AUD_STREAM_GET_FLAGS_REPLY,
     OBOS_AUD_QUERY_CONNECTIONS_REPLY,
+    OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY,
 
     /*
      * All status replies have no required payload,
@@ -112,6 +114,12 @@ typedef struct aud_query_connections_reply {
     struct aud_connection_desc descs[];
 } ALIGNAS(8) aud_query_connections_reply;
 
+typedef struct aud_query_output_parameters_reply {
+    aud_output_parameters params;
+    int input_channels;
+    float volume;
+} PACK aud_query_output_parameters_reply;
+
 /* Payload structures */
 /**************************************************/
 
@@ -144,7 +152,7 @@ typedef struct aud_close_stream_payload {
 
 typedef struct aud_query_output_device_payload {
     uint16_t output_id;
-} PACK aud_query_output_device_payload;
+} PACK aud_query_output_device_payload, aud_query_output_parameters_payload;
 
 typedef struct aud_data_payload {
     uint16_t stream_id;

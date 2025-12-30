@@ -82,4 +82,10 @@ typedef struct aud_output_dev {
     uint16_t output_id;
 } PACK aud_output_dev;
 
+typedef struct aud_output_parameters {
+	int channels;
+	int sample_rate;
+	int format_size;
+} aud_output_parameters;
+
 #define OBOS_AUD_DEFAULT_OUTPUT_DEV UINT16_MAX
