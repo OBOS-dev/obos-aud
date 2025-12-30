@@ -37,6 +37,8 @@ enum aud_opcode {
     OBOS_AUD_CONNECTION_GET_VOLUME,
     OBOS_AUD_STREAM_SET_FLAGS,
     OBOS_AUD_STREAM_GET_FLAGS,
+    OBOS_AUD_SET_NAME, /* sets the user-readable name of the current connection */
+    OBOS_AUD_QUERY_CONNECTIONS,
 
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
@@ -44,6 +46,7 @@ enum aud_opcode {
     OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY,
     OBOS_AUD_GET_VOLUME_REPLY,
     OBOS_AUD_STREAM_GET_FLAGS_REPLY,
+    OBOS_AUD_QUERY_CONNECTIONS_REPLY,
 
     /*
      * All status replies have no required payload,
@@ -96,6 +99,17 @@ typedef struct aud_get_volume_reply {
     float volume;
 } PACK aud_get_volume_reply;
 
+struct aud_connection_desc {
+    uint32_t sizeof_desc;
+    uint32_t client_id;
+    char name[];
+};
+
+#define autrans_next_connection_desc(desc) ((struct aud_connection_desc*)((uintptr_t)desc + desc->sizeof_desc))
+typedef struct aud_query_connections_reply {
+    struct aud_connection_desc descs[];
+} PACK aud_query_connections_reply;
+
 /* Payload structures */
 /**************************************************/
 
@@ -139,9 +153,14 @@ typedef struct aud_stream_set_flags_payload {
     uint16_t stream_id;
     uint32_t flags;
 } PACK aud_stream_set_flags_payload;
+
 typedef struct aud_stream_get_flags_payload {
     uint16_t stream_id;
 } PACK aud_stream_get_flags_payload;
+
+typedef struct aud_set_name_payload {
+    char name[];
+} aud_set_name_payload;
 
 /***************************************************/
 
@@ -162,7 +181,10 @@ typedef struct aud_packet
     
     uint32_t client_id;
 
-    void* payload;
+    union {
+        void* payload;
+        const void* cpayload;
+    };
     uint32_t payload_len;
 } aud_packet;
 
