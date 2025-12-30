@@ -77,6 +77,7 @@ int main(int argc, char** argv)
         return -1;
     }
     client_id = reply.client_id;
+    free(reply.payload);
 
     char* name = autrans_make_name(argv[0], true);
     autrans_set_name(socket, client_id, name);
