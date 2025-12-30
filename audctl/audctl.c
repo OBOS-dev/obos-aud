@@ -320,6 +320,7 @@ int main(int argc, char** argv)
         printf("  source channels: %d%s\n", reply.input_channels, reply.input_channels ? "" : " (idle)");
         printf("  buffer size (samples): %d\n", reply.buffer_samples);
         printf("  buffer size (seconds): %f\n", reply.buffer_samples / (float)reply.params.channels / (float)reply.params.sample_rate);
+        printf("  volume: %f%%\n", reply.volume);
     }
     else if (strcasecmp(command, "output-set-buffer-size-samples") == 0)
     {
