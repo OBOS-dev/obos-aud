@@ -171,6 +171,9 @@ typedef struct aud_packet
 int autrans_transmit(int fd, aud_packet* pckt);
 int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len);
 int autrans_initial_connection_request(int fd);
+int autrans_stream_open(int fd, uint32_t client_id, const aud_open_stream_payload* payload, uint16_t* stream_id, uint32_t* stream_flags);
+// *flags is set to the real flags on return.
+int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags);
 int autrans_disconnect(int fd, uint32_t client_id);
 int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id);
 

@@ -190,6 +190,140 @@ int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_
     return ret;
 }
 
+
+int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags)
+{
+    int res = 0;
+    do {
+        aud_stream_set_flags_payload payload = {};
+        payload.stream_id = stream_id;
+        payload.flags = *flags;
+
+        aud_packet reply = {};
+        aud_packet pckt = {};
+        pckt.opcode = OBOS_AUD_STREAM_SET_FLAGS;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if (autrans_transmit(socket, &pckt) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_transmit");
+            return -1;
+        }
+    
+        if ((res = autrans_receive(socket, &reply, NULL, 0)) < 0)
+            break;
+        if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+            continue;
+    
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
+    do {
+        aud_stream_get_flags_payload payload = {};
+        payload.stream_id = stream_id;
+
+        aud_packet reply = {};
+        aud_packet pckt = {};
+        pckt.opcode = OBOS_AUD_STREAM_GET_FLAGS;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if ((res = autrans_transmit(socket, &pckt)) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_transmit");
+            return res;
+        }
+    
+        if ((res = autrans_receive(socket, &reply, NULL, 0)) < 0)
+            return res;
+        
+        res = -1;
+        errno = EOPNOTSUPP;
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While fetching stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else if (reply.opcode != OBOS_AUD_STREAM_GET_FLAGS_REPLY)
+            fprintf(stderr, "While fetching stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        else {
+            aud_stream_get_flags_reply* reply_payload = reply.payload;
+            *flags = reply_payload->flags;
+            errno = 0;
+            res = 0;
+        }
+        
+        free(reply.payload);
+    } while(0);
+    return res;
+
+}
+
+
+int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_stream_payload* stream_info, uint16_t* stream_id, uint32_t* stream_flags)
+{
+    do {
+
+        aud_packet pckt = {};
+        aud_packet reply = {};
+        pckt.opcode = OBOS_AUD_OPEN_STREAM;
+        pckt.client_id = client_id;
+        pckt.payload = (void*)stream_info /* is not modified on transit */;
+        pckt.payload_len = sizeof(*stream_info);
+        if (autrans_transmit(socket, &pckt) < 0)
+            return -1;
+
+        const uint32_t transmission_id = pckt.transmission_id;
+
+        if (autrans_receive(socket, &reply, NULL, 0) < 0)
+            return -1;
+
+        if (transmission_id != reply.transmission_id)
+        {
+            fprintf(stderr, "Unexpected transmission ID in server reply.\n");
+            return -1;
+        }
+
+        if (reply.opcode == OBOS_AUD_OPEN_STREAM_REPLY)
+        {
+            aud_open_stream_reply *payload = reply.payload;
+            *stream_id = payload->stream_id;
+            free(payload);
+            break;
+        }
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While opening stream: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While opening stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
+    int sample_size = 2;
+    if (stream_flags && *stream_flags)
+        return autrans_stream_flags(socket, client_id, *stream_id, stream_flags);
+    return 0;
+}
+
 int autrans_open()
 {
     return autrans_open_uri(getenv("AUD_DISPLAY"));
