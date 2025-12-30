@@ -155,11 +155,11 @@ int main(int argc, char** argv)
         if (autrans_output_get_volume(socket, client_id, output_id, &volume) == 0)
             print_volume(volume);
     }
-    else if (strcasecmp(command, "connection-set-volume") == 0)
+    else if (strcasecmp(command, "connection-get-volume") == 0)
     {
         if (command_argc < 1)
         {
-            fprintf(stderr, "connection-set-volume connection_id\n");
+            fprintf(stderr, "connection-get-volume connection_id\n");
             goto die;
         }
         uint16_t connection_id = 0;
@@ -174,6 +174,11 @@ int main(int argc, char** argv)
 
         if (autrans_connection_get_volume(socket, client_id, connection_id, &volume) == 0)
             print_volume(volume);
+    }
+    else
+    {
+        fprintf(stderr, "Unknown command '%s'\n", command);
+        goto die;
     }
 
     die:
