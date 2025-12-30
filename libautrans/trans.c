@@ -274,6 +274,42 @@ int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uin
 
 }
 
+int autrans_stream_data(int socket, uint32_t client_id, uint16_t stream_id, const void* data, size_t len)
+{
+    aud_data_payload *payload = malloc(len+2);
+    memcpy(payload->data, data, len);
+    payload->stream_id = stream_id;
+
+    aud_packet pckt = {};
+    aud_packet reply = {};
+    pckt.opcode = OBOS_AUD_DATA;
+    pckt.client_id = client_id;
+    pckt.payload = payload;
+    pckt.payload_len = len+sizeof(aud_data_payload);
+    if (autrans_transmit(socket, &pckt) < 0)
+    {
+        shutdown(socket, SHUT_RDWR);
+        close(socket);
+        perror("autrans_transmit");
+        return -1;
+    }
+
+    if (autrans_receive(socket, &reply, NULL, 0) < 0)
+        return -1;
+    if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+        return 0;
+
+    if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+    {
+        fprintf(stderr, "While writing to stream: %s\n", autrans_opcode_to_string(reply.opcode));
+        if (reply.payload_len)
+            fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+    }
+    else
+        fprintf(stderr, "While writing to stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+    free(reply.payload);
+    return -1;
+}
 
 int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_stream_payload* stream_info, uint16_t* stream_id, uint32_t* stream_flags)
 {
