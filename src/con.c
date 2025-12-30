@@ -413,6 +413,38 @@ void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packe
     resp.transmission_id_valid = true;
     autrans_transmit(client->fd, &resp);
 }
+void obos_aud_process_output_device_query_parameters(obos_aud_connection* client, aud_packet* pckt)
+{
+    if (pckt->payload_len != sizeof(aud_query_output_parameters_payload))
+    {
+        inval_status(client, pckt, "Invalid payload length.");
+        return;
+    }
+
+    aud_query_output_parameters_payload* payload = pckt->payload;
+    mixer_output_device* dev = mixer_output_from_id(payload->output_id);
+    if (!dev)
+    {
+        inval_status(client, pckt, "Invalid output ID.");
+        return;
+    }
+
+    aud_query_output_parameters_reply reply_payload = {};
+    reply_payload.params.channels = dev->channels;
+    reply_payload.params.sample_rate = dev->sample_rate;
+    reply_payload.params.format_size = dev->format_size;
+    reply_payload.input_channels = dev->input_channels;
+    reply_payload.volume = dev->volume;
+
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY;
+    resp.client_id = client->client_id;
+    resp.payload = &reply_payload;
+    resp.payload_len = sizeof(reply_payload);
+    resp.transmission_id = pckt->transmission_id;
+    resp.transmission_id_valid = true;
+    autrans_transmit(client->fd, &resp);
+}
 
 void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt)
 {

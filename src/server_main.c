@@ -362,11 +362,39 @@ int main(int argc, char** argv)
                 case OBOS_AUD_STREAM_GET_FLAGS:
                     obos_aud_process_stream_get_flags(con, &curr->pckt);
                     break;
+                case OBOS_AUD_STREAM_SET_VOLUME:
+                    obos_aud_process_stream_set_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_STREAM_GET_VOLUME:
+                    obos_aud_process_stream_get_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_CONNECTION_GET_VOLUME:
+                    obos_aud_process_conn_get_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_CONNECTION_SET_VOLUME:
+                    obos_aud_process_conn_set_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_OUTPUT_GET_VOLUME:
+                    obos_aud_process_conn_get_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_OUTPUT_SET_VOLUME:
+                    obos_aud_process_conn_set_volume(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_SET_NAME:
+                    obos_aud_process_set_name(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_QUERY_CONNECTIONS:
+                    obos_aud_process_query_connections(con, &curr->pckt);
+                    break;
+                case OBOS_AUD_QUERY_OUTPUT_PARAMETERS:
+                    obos_aud_process_output_device_query_parameters(con, &curr->pckt);
+                    break;
 
                 case OBOS_AUD_STATUS_REPLY_OK:
                 case OBOS_AUD_STATUS_REPLY_UNSUPPORTED:
                 case OBOS_AUD_STATUS_REPLY_INVAL:
                 case OBOS_AUD_STATUS_REPLY_DISCONNECTED:
+                case OBOS_AUD_REQUEST_REPLY_BEGIN...OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY:
                     break;
 
                 // Invalid opcode

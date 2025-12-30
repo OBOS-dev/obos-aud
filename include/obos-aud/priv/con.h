@@ -69,6 +69,7 @@ void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet* pckt);
 obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt);
+void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_output_device_query_parameters(obos_aud_connection* client, aud_packet* pckt);
 
 obos_aud_stream_handle* obos_aud_get_stream_by_id(obos_aud_connection* con, uint16_t stream_id);
-void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packet* pckt);
