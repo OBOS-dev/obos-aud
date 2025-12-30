@@ -335,27 +335,6 @@ void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* 
     autrans_transmit(client->fd, &resp);
 }
 
-void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt)
-{
-    if (pckt->payload_len < sizeof(aud_data_payload))
-    {
-        inval_status(client, pckt, "Invalid payload length.");
-        return;
-    }
-
-    aud_data_payload* payload = pckt->payload;
-    // aud_backend_queue_data(1, payload->data);
-    obos_aud_stream_handle* stream = obos_aud_get_stream_by_id(client, payload->stream_id);
-    if (!stream)
-    {
-        inval_status(client, pckt, "Invalid stream ID.");
-        return;
-    }
-    aud_stream_push(&stream->stream_node->data, payload->data, pckt->payload_len-sizeof(*payload));
-
-    ok_status(client, pckt);
-}
-
 void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* hnd, bool locked)
 {
     if (locked)
@@ -371,7 +350,10 @@ void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* 
     if (locked)
         pthread_mutex_unlock(&client->stream_handles.lock);
     mixer_output_remove_stream_dev(hnd->dev, hnd->stream_node);
-    free(hnd);
+    if (!hnd->refs)
+        free(hnd);
+    else
+        hnd->should_free = true;
 }
 
 obos_aud_stream_handle* obos_aud_get_stream_by_id(obos_aud_connection* con, uint16_t stream_id)
@@ -566,5 +548,6 @@ void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt)
     if (g_connections.tail == client)
         g_connections.tail = client->prev;
     pthread_mutex_unlock(&g_connections.lock);
+    if (client->name) free(client->name);
     free(client);
 }

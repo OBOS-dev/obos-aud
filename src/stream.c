@@ -102,29 +102,44 @@ void aud_stream_initialize(aud_stream* stream, int sample_rate, int dev_sample_r
     stream->buffer = malloc(stream->size);
 }
 
-void aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len)
+bool aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len, bool blocking)
 {
     if (len > (stream->size - stream->ptr))
     {
         pthread_mutex_lock(&stream->mut);
         while (stream->ptr > 0)
+        {
+            if (!blocking)
+            {
+                pthread_mutex_unlock(&stream->mut);
+                return false;
+            }
             pthread_cond_wait(&stream->write_event, &stream->mut);
+        }
         pthread_mutex_unlock(&stream->mut);
         size_t initial_len = len;
         while (len)
         {
             size_t nToWrite = len > stream->size ? stream->size : len;
-            aud_stream_push_no_decode(stream, (const char*)data + (initial_len-len), nToWrite);
+            aud_stream_push_no_decode(stream, (const char*)data + (initial_len-len), nToWrite, blocking);
             len -= nToWrite;
         }
-        return;
+        return true;
     }
     pthread_mutex_lock(&stream->mut);
     while (stream->ptr == stream->size)
+    {
+        if (!blocking)
+        {
+            pthread_mutex_unlock(&stream->mut);
+            return false;
+        }
         pthread_cond_wait(&stream->write_event, &stream->mut);
+    }
     memcpy((char*)stream->buffer + stream->ptr, data, len);
     stream->ptr += len;
     pthread_mutex_unlock(&stream->mut);
+    return true;
 }
 
 static int16_t read_sample(const int16_t* buffer, int channel, int channels, size_t buffer_len, float idx)
@@ -137,10 +152,10 @@ static float clamp(float value, float min, float max)
     return value < min ? min : ((value > max) ? max : value);
 }
 
-void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
+bool aud_stream_push(aud_stream* stream, const void* buf, size_t len, bool blocking, const void** decoded_out, size_t* decoded_data_len)
 {
     if (((stream->flags & OBOS_AUD_STREAM_DECODE_MASK) == 0) && stream->dev->sample_rate == stream->sample_rate)
-        return aud_stream_push_no_decode(stream, buf, len); // lol returning from a void function
+        return aud_stream_push_no_decode(stream, buf, len, blocking);
     size_t newlen = len;
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
         newlen /=  (8.f/16.f);
@@ -221,8 +236,19 @@ void aud_stream_push(aud_stream* stream, const void* buf, size_t len)
         newlen = new_buf_len;
     }
     len = newlen;
-    aud_stream_push_no_decode(stream, decoded, len);
-    free(decoded);
+    bool res = aud_stream_push_no_decode(stream, decoded, len, blocking);
+    if (res)
+    {
+        free(decoded);
+        *decoded_out = NULL;
+        *decoded_data_len = 0;
+    }
+    else
+    {
+        *decoded_out = decoded;
+        *decoded_data_len = len;
+    }
+    return res;
 }
 
 bool aud_stream_read(aud_stream* stream, void* data, size_t len, bool peek, bool blocking)

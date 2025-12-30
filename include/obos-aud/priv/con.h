@@ -29,6 +29,8 @@ typedef struct obos_aud_stream_handle {
     mixer_output_device* dev;
     aud_stream_node* stream_node;
     uint16_t stream_id;
+    uint32_t refs; /* only to be referenced in a deferred OBOS_AUD_DATA packet */
+    bool should_free : 1;
     struct obos_aud_stream_handle *next, *prev;
 } obos_aud_stream_handle;
 
@@ -57,7 +59,6 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
 void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_set_flags(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* pckt);
-void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_stream_set_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_output_set_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_conn_set_volume(obos_aud_connection* client, aud_packet* pckt);

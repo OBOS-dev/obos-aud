@@ -36,11 +36,17 @@ static const char* const usage = "%s [-l connection_mode] [-n connection_mode] [
 struct packet_node {
     aud_packet pckt;
     size_t poll_fd_idx;
+    struct {
+        const void* buf;
+        size_t len;
+        obos_aud_stream_handle* stream;
+    } decoded_data;
     int fd;
     struct packet_node *next, *prev;
 };
 struct {
     struct packet_node *head, *tail;
+    struct packet_node *first_deferred;
     pthread_mutex_t mutex;
 } g_packet_queue = {
     .mutex = PTHREAD_MUTEX_INITIALIZER
@@ -48,6 +54,8 @@ struct {
 
 static struct packet_node* receive_packet(int fd);
 static struct packet_node* pop_packet();
+static void mark_done();
+static void append_packet(struct packet_node*, bool is_deferred);
 
 static void quit(int s)
 {
@@ -245,7 +253,7 @@ int main(int argc, char** argv)
     // Main server loop
     while (1)
     {
-        int e = TEMP_FAILURE_RETRY(poll(fds, nToPoll, -1));
+        int e = TEMP_FAILURE_RETRY(poll(fds, nToPoll, 1000));
         if (e < 0)
         {
             perror("poll");
@@ -323,6 +331,9 @@ int main(int argc, char** argv)
                     continue;
                 }
             }
+
+
+            bool do_not_free = false;
             
             switch (curr->pckt.opcode) {
                 case OBOS_AUD_INITIAL_CONNECTION_REQUEST:
@@ -356,8 +367,107 @@ int main(int argc, char** argv)
                     obos_aud_process_output_set_buffer_samples(con, &curr->pckt);
                     break;
                 case OBOS_AUD_DATA:
-                    obos_aud_process_data(con, &curr->pckt);
+                {
+                    if (curr->pckt.payload_len < sizeof(aud_data_payload))
+                    {
+                        aud_packet inval_status = {
+                            .opcode = OBOS_AUD_STATUS_REPLY_INVAL,
+                            .client_id = con->client_id,
+                            .payload = "Invalid payload length.",
+                            .payload_len = 24,
+                            .transmission_id = curr->pckt.transmission_id,
+                            .transmission_id_valid = true,
+                        };
+                        autrans_transmit(curr->fd, &inval_status);
+                        break;
+                    }
+
+                    aud_data_payload* payload = curr->pckt.payload;
+                    const void* data = payload->data;
+                    size_t len = curr->pckt.payload_len-sizeof(*payload);
+                    obos_aud_stream_handle* stream = NULL;
+
+                    if (curr->decoded_data.buf)
+                    {
+                        len = curr->decoded_data.len;
+                        data = curr->decoded_data.buf;
+                        stream = curr->decoded_data.stream;
+                    }
+                    else
+                    {
+                        stream = obos_aud_get_stream_by_id(con, payload->stream_id);
+                        if (!stream)
+                        {
+                            aud_packet inval_status = {
+                                .opcode = OBOS_AUD_STATUS_REPLY_INVAL,
+                                .client_id = con->client_id,
+                                .payload = "Invalid stream ID.",
+                                .payload_len = 19,
+                                .transmission_id = curr->pckt.transmission_id,
+                                .transmission_id_valid = true,
+                            };
+                            autrans_transmit(curr->fd, &inval_status);
+                            break;
+                        }
+                        stream->refs++;
+                    }
+                    const void* decoded = NULL;
+                    size_t decoded_len = 0;
+
+                    if (stream->should_free)
+                    {
+                        if (!(--stream->refs))
+                            free(stream);
+                        aud_packet stream_dead_status = {
+                            .opcode = OBOS_AUD_STATUS_REPLY_STREAM_DEAD,
+                            .client_id = con->client_id,
+                            .payload = "Asynchronous write failed after stream died.",
+                            .payload_len = 45,
+                            .transmission_id = curr->pckt.transmission_id,
+                            .transmission_id_valid = true,
+                        };
+                        autrans_transmit(curr->fd, &stream_dead_status);
+                        if (curr->decoded_data.buf)
+                        {
+                            do_not_free = true;
+                            free(curr);
+                            free((void*)data);
+                        }
+                        break;
+                    }
+
+                    bool written = data == curr->decoded_data.buf ? 
+                                    aud_stream_push_no_decode(&stream->stream_node->data, data, len, false) :
+                                    aud_stream_push(&stream->stream_node->data, data, len, false, &decoded, &decoded_len);
+                    if (written)
+                    {
+                        ok_status.client_id = curr->pckt.client_id;
+                        ok_status.transmission_id = curr->pckt.transmission_id;
+                        ok_status.transmission_id_valid = true;
+                        autrans_transmit(curr->fd, &ok_status);
+                        if (data == curr->decoded_data.buf)
+                        {
+                            do_not_free = true;
+                            free(curr);
+                            free((void*)data);
+                        }
+                        --stream->refs;
+                    }
+                    else
+                    {
+                        append_packet(curr, true);
+                        do_not_free = true;
+                        if (decoded)
+                        {
+                            curr->decoded_data.buf = decoded;
+                            curr->decoded_data.len = decoded_len;
+                            curr->decoded_data.stream = stream;
+                            free(payload);
+                        }
+                    }
+
                     break;
+                }
                 case OBOS_AUD_STREAM_SET_FLAGS:
                     obos_aud_process_stream_set_flags(con, &curr->pckt);
                     break;
@@ -408,9 +518,15 @@ int main(int argc, char** argv)
                     break;
                 }
             }
-            free(curr->pckt.payload);
-            free(curr);
+            if (!do_not_free)
+            {
+                assert(!curr->next);
+                assert(!curr->prev);
+                free(curr->pckt.payload);
+                free(curr);
+            }
         }
+        mark_done();
     }
 
     // Cleanup
@@ -432,14 +548,7 @@ static struct packet_node* receive_packet(int fd)
         return NULL;
     }
     node->fd = fd;
-    pthread_mutex_lock(&g_packet_queue.mutex);
-    if (!g_packet_queue.head)
-        g_packet_queue.head = node;
-    if (g_packet_queue.tail)
-        g_packet_queue.tail->next = node;
-    node->prev = g_packet_queue.tail;
-    g_packet_queue.tail = node;
-    pthread_mutex_unlock(&g_packet_queue.mutex);
+    append_packet(node, false);
     return node;
 }
 
@@ -447,17 +556,37 @@ static struct packet_node* pop_packet()
 {
     pthread_mutex_lock(&g_packet_queue.mutex);
     struct packet_node* ret = g_packet_queue.head;
-    if (!ret)
+    if (!ret || ret == g_packet_queue.first_deferred)
     {
         pthread_mutex_unlock(&g_packet_queue.mutex);
         return NULL;
     }
     g_packet_queue.head = ret->next;
     if (g_packet_queue.tail == ret)
-        g_packet_queue.tail = NULL;
+        g_packet_queue.tail = ret->prev;
     else
         ret->next->prev = NULL;
-    g_packet_queue.head = ret->next;
+    ret->prev = NULL;
+    ret->next = NULL;
     pthread_mutex_unlock(&g_packet_queue.mutex);
     return ret;
+}
+
+static void mark_done()
+{
+    g_packet_queue.first_deferred = NULL;
+}
+
+static void append_packet(struct packet_node* node, bool is_deferred)
+{
+    pthread_mutex_lock(&g_packet_queue.mutex);
+    if (!g_packet_queue.head)
+        g_packet_queue.head = node;
+    if (g_packet_queue.tail)
+        g_packet_queue.tail->next = node;
+    node->prev = g_packet_queue.tail;
+    g_packet_queue.tail = node;
+    if (is_deferred && !g_packet_queue.first_deferred )
+        g_packet_queue.first_deferred = node;
+    pthread_mutex_unlock(&g_packet_queue.mutex);
 }
