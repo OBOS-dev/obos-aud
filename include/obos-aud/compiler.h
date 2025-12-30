@@ -10,6 +10,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <assert.h>
 
 #ifndef __GNUC__
 #   error GNU C Compiler required for obos-aud headers
@@ -54,3 +55,5 @@
         (result);\
     })
 #endif
+
+static_assert(sizeof(float) == 4, "sizeof(float) is not 4!");
