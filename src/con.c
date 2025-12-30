@@ -185,7 +185,7 @@ void obos_aud_process_output_set_volume(obos_aud_connection* client, aud_packet*
 void obos_aud_process_stream_get_volume(obos_aud_connection* client, aud_packet* pckt)
 {
 #define get_stream_id(x) obos_aud_get_stream_by_id(client, x)
-    set_volume_common(pckt, client, get_stream_id, obos_aud_stream_handle, stream_node->data.volume, );
+    get_volume_common(pckt, client, get_stream_id, obos_aud_stream_handle, stream_node->data.volume, );
 #undef get_stream_id
 }
 
@@ -197,7 +197,7 @@ void obos_aud_process_output_get_volume(obos_aud_connection* client, aud_packet*
 void obos_aud_process_conn_get_volume(obos_aud_connection* client, aud_packet* pckt)
 {
 #define get_con_id(x) obos_aud_get_client(-1, x)
-    set_volume_common(pckt, client, get_con_id, obos_aud_connection, volume, 32);
+    get_volume_common(pckt, client, get_con_id, obos_aud_connection, volume, 32);
 #undef get_con_id
 }
 
