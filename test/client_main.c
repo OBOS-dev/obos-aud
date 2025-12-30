@@ -170,6 +170,10 @@ int main(int argc, char** argv)
 
     free(reply.payload);
 
+    char* name = autrans_make_name(argv[0], true);
+    autrans_set_name(socket, client_id, name);
+    free(name);
+
     uint16_t stream = 0;
     aud_output_dev output_info = {};
     do {
