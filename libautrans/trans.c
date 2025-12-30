@@ -54,7 +54,7 @@ int autrans_transmit(int fd, aud_packet* pckt)
     hdr->client_id = pckt->client_id;
 
     if (pckt->payload_len)
-        memcpy(hdr->payload, pckt->payload, pckt->payload_len);
+        memcpy(hdr->payload, pckt->cpayload, pckt->payload_len);
 
     int nTransmitted = 0;
     int nLeft = hdr->size;

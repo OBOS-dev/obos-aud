@@ -41,6 +41,7 @@ typedef struct obos_aud_connection {
         pthread_mutex_t lock;
         obos_aud_stream_handle *head, *tail;  
     } stream_handles;
+    char* name;
     struct obos_aud_connection *next, *prev;
 } obos_aud_connection;
 
@@ -64,9 +65,10 @@ void obos_aud_process_stream_get_volume(obos_aud_connection* client, aud_packet*
 void obos_aud_process_output_get_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_process_conn_get_volume(obos_aud_connection* client, aud_packet* pckt);
 void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* hnd, bool locked);
-obos_aud_stream_handle* obos_aud_get_stream_by_id(obos_aud_connection* con, uint16_t stream_id);
-
-void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packet* pckt);
-
-obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt);
 void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt);
+void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet* pckt);
+obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt);
+
+obos_aud_stream_handle* obos_aud_get_stream_by_id(obos_aud_connection* con, uint16_t stream_id);
+void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packet* pckt);

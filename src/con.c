@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <sys/poll.h>
 
@@ -52,6 +53,29 @@ obos_aud_connection* obos_aud_get_client_by_fd(int fd)
     }
     pthread_mutex_unlock(&g_connections.lock);
     return NULL;
+}
+
+static int ok_status(obos_aud_connection* client, aud_packet* pckt)
+{
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
+    resp.client_id = client->client_id;
+    resp.payload = NULL;
+    resp.payload_len = 0;
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id_valid = !!pckt;
+    return autrans_transmit(client->fd, &resp);
+}
+static int inval_status(obos_aud_connection* client, aud_packet* pckt, const char* msg)
+{
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
+    resp.client_id = client->client_id;
+    resp.cpayload = msg;
+    resp.payload_len = strlen(msg)+1;
+    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id_valid = !!pckt;
+    return autrans_transmit(client->fd, &resp);
 }
 
 obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt)
@@ -96,68 +120,33 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
 do {\
     if (pckt->payload_len != sizeof(aud_set_volume_payload))\
     {\
-        aud_packet resp = {};\
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
-        resp.client_id = client->client_id;\
-        resp.payload = "Invalid payload length.";\
-        resp.payload_len = 24;\
-        resp.transmission_id = pckt->transmission_id;\
-        resp.transmission_id_valid = true;\
-        autrans_transmit(client->fd, &resp);\
+        inval_status(client, pckt, "Invalid payload length.");\
         return;\
     }\
     aud_set_volume_payload* payload = pckt->payload;\
     obj_type* obj = fetch_obj(payload->obj_id##id_suffix);\
     if (!obj) \
     {\
-        aud_packet resp = {};\
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
-        resp.client_id = client->client_id;\
-        resp.payload = "Invalid object id.";\
-        resp.payload_len = 19;\
-        resp.transmission_id = pckt->transmission_id;\
-        resp.transmission_id_valid = true;\
-        autrans_transmit(client->fd, &resp);\
+        inval_status(client, pckt, "Invalid object ID.");\
         return;\
     }\
     obj->volume_field = mixer_normalize_volume(payload->volume);\
 \
-    aud_packet resp = {};\
-    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;\
-    resp.client_id = client->client_id;\
-    resp.payload = NULL;\
-    resp.payload_len = 0;\
-    resp.transmission_id = pckt ? pckt->transmission_id : 0;\
-    resp.transmission_id_valid = !!pckt;\
-    autrans_transmit(client->fd, &resp);\
+    ok_status(client, pckt);\
 } while(0)
 
 #define get_volume_common(pckt, client, fetch_obj, obj_type, volume_field, id_suffix)\
 do {\
     if (pckt->payload_len != sizeof(aud_get_volume_payload))\
     {\
-        aud_packet resp = {};\
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
-        resp.client_id = client->client_id;\
-        resp.payload = "Invalid payload length.";\
-        resp.payload_len = 24;\
-        resp.transmission_id = pckt->transmission_id;\
-        resp.transmission_id_valid = true;\
-        autrans_transmit(client->fd, &resp);\
+        inval_status(client, pckt, "Invalid payload length.");\
         return;\
     }\
     aud_get_volume_payload* payload = pckt->payload;\
     obj_type* obj = fetch_obj(payload->obj_id##id_suffix);\
     if (!obj) \
     {\
-        aud_packet resp = {};\
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;\
-        resp.client_id = client->client_id;\
-        resp.payload = "Invalid object id.";\
-        resp.payload_len = 19;\
-        resp.transmission_id = pckt->transmission_id;\
-        resp.transmission_id_valid = true;\
-        autrans_transmit(client->fd, &resp);\
+        inval_status(client, pckt, "Invalid object ID.");\
         return;\
     }\
 \
@@ -216,14 +205,7 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
 {
     if (pckt->payload_len != sizeof(aud_open_stream_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -245,14 +227,7 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
     mixer_output_device* dev = mixer_output_from_id(payload->output_id);
     if (!dev)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid output ID.";
-        resp.payload_len = 19;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid output ID.");
         return;
     }
     aud_stream_node* node = mixer_output_add_stream_dev(dev, payload->target_sample_rate, payload->input_channels, payload->volume, client);
@@ -288,14 +263,7 @@ void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt
 {
     if (pckt->payload_len != sizeof(aud_close_stream_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -303,41 +271,20 @@ void obos_aud_process_stream_close(obos_aud_connection* client, aud_packet* pckt
     obos_aud_stream_handle* hnd = obos_aud_get_stream_by_id(client, payload->stream_id);
     if (!hnd)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid stream ID.";
-        resp.payload_len = 19;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid stream ID.");
         return;
     }
 
     obos_aud_stream_close(client, hnd, true);
 
-    aud_packet resp = {};
-    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
-    resp.client_id = client->client_id;
-    resp.payload = NULL;
-    resp.payload_len = 0;
-    resp.transmission_id = pckt ? pckt->transmission_id : 0;
-    resp.transmission_id_valid = !!pckt;
-    autrans_transmit(client->fd, &resp);
+    ok_status(client, pckt);
 }
 
 void obos_aud_process_stream_set_flags(obos_aud_connection* client, aud_packet* pckt)
 {
     if (pckt->payload_len != sizeof(aud_stream_set_flags_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -345,53 +292,25 @@ void obos_aud_process_stream_set_flags(obos_aud_connection* client, aud_packet* 
     obos_aud_stream_handle* hnd = obos_aud_get_stream_by_id(client, payload->stream_id);
     if (!hnd)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid stream ID.";
-        resp.payload_len = 19;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid stream ID.");
         return;
     }
 
     if (__builtin_popcount(payload->flags & OBOS_AUD_STREAM_DECODE_MASK) > 1)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid flag combination.";
-        resp.payload_len = 26;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid flag combination.");
         return;
     }
     
     hnd->stream_node->data.flags = payload->flags & OBOS_AUD_STREAM_VALID_FLAG_MASK;
 
-    aud_packet resp = {};
-    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
-    resp.client_id = client->client_id;
-    resp.payload = NULL;
-    resp.payload_len = 0;
-    resp.transmission_id = pckt ? pckt->transmission_id : 0;
-    resp.transmission_id_valid = !!pckt;
-    autrans_transmit(client->fd, &resp);
+    ok_status(client, pckt);
 }
 void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* pckt)
 {
     if (pckt->payload_len != sizeof(aud_stream_get_flags_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -399,14 +318,7 @@ void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* 
     obos_aud_stream_handle* hnd = obos_aud_get_stream_by_id(client, payload->stream_id);
     if (!hnd)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid stream ID.";
-        resp.payload_len = 19;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid stream ID.");
         return;
     }
 
@@ -427,14 +339,7 @@ void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt)
 {
     if (pckt->payload_len < sizeof(aud_data_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -443,26 +348,12 @@ void obos_aud_process_data(obos_aud_connection* client, aud_packet* pckt)
     obos_aud_stream_handle* stream = obos_aud_get_stream_by_id(client, payload->stream_id);
     if (!stream)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid stream ID.";
-        resp.payload_len = 19;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid stream ID.");
         return;
     }
     aud_stream_push(&stream->stream_node->data, payload->data, pckt->payload_len-sizeof(*payload));
 
-    aud_packet resp = {};
-    resp.opcode = OBOS_AUD_STATUS_REPLY_OK;
-    resp.client_id = client->client_id;
-    resp.payload = NULL;
-    resp.payload_len = 0;
-    resp.transmission_id = pckt ? pckt->transmission_id : 0;
-    resp.transmission_id_valid = !!pckt;
-    autrans_transmit(client->fd, &resp);
+    ok_status(client, pckt);
 }
 
 void obos_aud_stream_close(obos_aud_connection* client, obos_aud_stream_handle* hnd, bool locked)
@@ -498,14 +389,7 @@ void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packe
 {
     if (pckt->payload_len != sizeof(aud_query_output_device_payload))
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid payload length.";
-        resp.payload_len = 24;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid payload length.");
         return;
     }
 
@@ -513,14 +397,7 @@ void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packe
     mixer_output_device* dev = mixer_output_from_id(payload->output_id);
     if (!dev)
     {
-        aud_packet resp = {};
-        resp.opcode = OBOS_AUD_STATUS_REPLY_INVAL;
-        resp.client_id = client->client_id;
-        resp.payload = "Invalid output device ID.";
-        resp.payload_len = 26;
-        resp.transmission_id = pckt->transmission_id;
-        resp.transmission_id_valid = true;
-        autrans_transmit(client->fd, &resp);
+        inval_status(client, pckt, "Invalid output ID.");
         return;
     }
 
@@ -535,6 +412,64 @@ void obos_aud_process_output_device_query(obos_aud_connection* client, aud_packe
     resp.transmission_id = pckt->transmission_id;
     resp.transmission_id_valid = true;
     autrans_transmit(client->fd, &resp);
+}
+
+void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt)
+{
+    if (pckt->payload_len == 0)
+    {
+        inval_status(client, pckt, "Invalid payload length.");
+        return;
+    }
+
+    aud_set_name_payload* payload = pckt->payload;
+    client->name = memcpy(malloc(pckt->payload_len+1), payload->name, pckt->payload_len);
+    client->name[pckt->payload_len] = 0;
+
+    ok_status(client, pckt);    
+}
+
+void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet* pckt)
+{
+    if (pckt->payload_len > 0)
+    {
+        inval_status(client, pckt, "Invalid payload length.");
+        return;
+    }
+
+    pthread_mutex_lock(&g_connections.lock);
+    size_t len = sizeof(aud_query_connections_reply);
+    for (obos_aud_connection* curr = g_connections.head; curr; )
+    {
+        len += strlen(curr->name);
+        len += sizeof(struct aud_connection_desc);
+
+        curr = curr->next;
+    }
+    aud_query_connections_reply* reply = malloc(len);
+    struct aud_connection_desc* curr_desc = reply->descs;
+    for (obos_aud_connection* curr = g_connections.head; curr; )
+    {
+        size_t name_len = strlen(curr->name);
+        curr_desc->sizeof_desc = name_len + sizeof(struct aud_connection_desc);
+        curr_desc->client_id = curr->client_id;
+        memcpy(curr_desc->name, curr->name, name_len);        
+
+        curr = curr->next;
+        curr_desc = autrans_next_connection_desc(curr_desc);
+    }
+    pthread_mutex_unlock(&g_connections.lock);
+
+    aud_packet resp = {};
+    resp.opcode = OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY;
+    resp.client_id = client->client_id;
+    resp.payload = reply;
+    resp.payload_len = len;
+    resp.transmission_id = pckt->transmission_id;
+    resp.transmission_id_valid = true;
+    autrans_transmit(client->fd, &resp);
+    
+    free(reply);
 }
 
 void obos_aud_process_disconnect(obos_aud_connection* client, aud_packet* pckt)
