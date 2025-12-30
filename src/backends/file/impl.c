@@ -110,7 +110,7 @@ int aud_backend_configure_output(int output_id, int sample_rate, int channels, i
     s_sample_rate = sample_rate;
     s_channels = channels;
     s_format_size = format_size;
-    fcntl(s_backend_file_output, F_SETPIPE_SZ, s_sample_rate*s_channels*(s_format_size/8));
+    fcntl(s_backend_file_output, F_SETPIPE_SZ, s_sample_rate*s_channels*(s_format_size/8)*10);
     return 0;
 }
 
