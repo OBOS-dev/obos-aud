@@ -11,8 +11,11 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <strings.h>
+#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+
+#include <sys/param.h>
 
 const char* usage = "%s [-d server_uri] [-h] command...\n";
 
@@ -26,6 +29,55 @@ static void print_volume(float volume)
     if (volume > 100)
         printf("*");
     printf("|\n");
+}
+
+static int query_output(int socket, uint32_t client_id, uint16_t output, aud_output_dev* output_info)
+{
+    do {
+        aud_packet reply = {};
+        uint32_t transmission_id = 0;
+        if (autrans_query_output(socket, client_id, output, &transmission_id) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_transmit");
+            return -1;
+        }
+        if (autrans_receive(socket, &reply, NULL, 0) < 0)
+        {
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            perror("autrans_receive");
+            return -1;
+        }
+        if (transmission_id != reply.transmission_id)
+        {
+            autrans_disconnect(socket, client_id);
+            shutdown(socket, SHUT_RDWR);
+            close(socket);
+            fprintf(stderr, "Unexpected transmission ID in server reply.\n");
+            return -1;
+        }
+
+        if (reply.opcode == OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY)
+        {
+            aud_query_output_device_reply *payload = reply.payload;
+            memcpy(output_info, &payload->info, MIN(sizeof(*output_info), reply.payload_len));
+            free(payload);
+            break;
+        }
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While querying output device: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While querying output device: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
 }
 
 int main(int argc, char** argv)
@@ -192,6 +244,82 @@ int main(int argc, char** argv)
             printf("connection 0x%x \"%.*s\"%s\n", curr->client_id, (int)(curr->sizeof_desc - sizeof(*curr)), curr->name, curr->client_id == client_id ? " (us)" : "");
 
         free(descs);
+    }
+    else if (strcasecmp(command, "output-query") == 0)
+    {
+        uint16_t output = OBOS_AUD_DEFAULT_OUTPUT_DEV;
+        if (command_argc == 1)
+        {
+            errno = 0;
+            output = strtoul(command_argv[0], NULL, 0);
+            if (errno != 0)
+            {
+                fprintf(stderr, "Expected unsigned integer, got %s\n", command_argv[0]);
+                goto die;
+            }
+        }
+
+        aud_output_dev output_info = {};
+        if (query_output(socket, client_id, output, &output_info) < 0)
+            goto die;
+
+        printf("Output 0x%x properties:\n", output_info.output_id);
+        printf("  type: %s\n", aud_output_type_to_str[output_info.type]);
+        printf("  color: %s\n", aud_output_color_to_str[output_info.type]);
+        printf("  location: %s\n", aud_output_location_to_str[output_info.type]);
+        printf("  flags: ");
+        if (!output_info.flags)
+            printf("N/A (0x0)\n");
+        else
+        {
+            if (output_info.flags & OBOS_AUD_OUTPUT_FLAGS_DEFAULT)
+                printf("DEFAULT");
+            printf(" (0x%x)\n", output_info.flags);
+        }
+    }
+    else if (strcasecmp(command, "output-query-parameters") == 0)
+    {
+        uint16_t output = OBOS_AUD_DEFAULT_OUTPUT_DEV;
+        if (command_argc == 1)
+        {
+            errno = 0;
+            output = strtoul(command_argv[0], NULL, 0);
+            if (errno != 0)
+            {
+                fprintf(stderr, "Expected unsigned integer, got %s\n", command_argv[0]);
+                goto die;
+            }
+        }
+
+        if (output == OBOS_AUD_DEFAULT_OUTPUT_DEV)
+        {
+            aud_output_dev output_info = {};
+            if (query_output(socket, client_id, output, &output_info) < 0)
+                goto die;
+            output = output_info.output_id;
+        }
+
+        aud_query_output_parameters_reply reply = {};
+        if (autrans_query_output_parameters(socket, client_id, output, &reply) < 0)
+            goto die;
+
+        const char* format = "";
+        switch (reply.params.format_size) {
+            case 8: format = "PCM8"; break;
+            case 16: format = "PCM16"; break;
+            case 20: format = "PCM20"; break;
+            case 24: format = "PCM24"; break;
+            case 32: format = "PCM32"; break;
+            default: format = "UNKNOWN";
+        }
+
+        printf("Output 0x%x parameters:\n", output);
+        printf("  sample rate: %d\n", reply.params.sample_rate);
+        printf("  output channels: %d\n", reply.params.channels);
+        printf("  output stream format: %s\n", format);
+        printf("  source channels: %d%s\n", reply.input_channels, reply.input_channels ? "" : " (idle)");
+        printf("  buffer size (samples): %d\n", reply.buffer_samples);
+        printf("  buffer size (seconds): %f\n", reply.buffer_samples / (float)reply.params.channels / (float)reply.params.sample_rate);
     }
     else
     {
