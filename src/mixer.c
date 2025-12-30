@@ -16,7 +16,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
-#include <math.h>
 
 mixer_output_device* g_outputs;
 size_t g_output_count;

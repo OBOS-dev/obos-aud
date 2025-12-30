@@ -15,7 +15,6 @@
 #include <strings.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <stdio.h>
