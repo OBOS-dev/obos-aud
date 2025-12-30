@@ -397,6 +397,20 @@ int main(int argc, char** argv)
 
         printf("set buffer size to %d sample%c (%f seconds)\n", samples, samples != 1 ? 's' : '\0', time);
     }
+    else if (strcasecmp(command, "help") == 0)
+    {
+        printf("Valid commands:\n");
+        printf("  output-set-volume [output_id] volume: Sets an output's volume\n");
+        printf("  connection-set-volume [output_id] volume: Sets a connection's volume\n");
+        printf("  output-get-volume [output_id]: Retrieves an output's volume\n");
+        printf("  connection-get-volume [output_id]: Retrieves a connection's volume\n");
+        printf("  get-connections: Queries all connected processes and prints their names.\n");
+        printf("  output-query [output_id]: Queries an output's properties.\n");
+        printf("  output-query-parameters [output_id]: Queries an output's parameters.\n");
+        printf("  output-set-buffer-size-samples [output_id] samples: Sets an output's buffer size in samples.\n");
+        printf("  output-set-buffer-size-seconds [output_id] seconds: Sets an output's buffer size in seconds.\n");
+        printf("  help: Prints this message.\n");
+    }
     else
     {
         fprintf(stderr, "Unknown command '%s'\n", command);
