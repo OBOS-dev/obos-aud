@@ -171,11 +171,51 @@ int autrans_initial_connection_request(int fd)
     aud_packet pckt = {.opcode=OBOS_AUD_INITIAL_CONNECTION_REQUEST};
     return autrans_transmit(fd, &pckt);
 }
+
+int autrans_set_name(int fd, uint32_t client_id, const char* name)
+{
+    if (!name)
+        return -1;
+
+    aud_packet pckt = {};
+    pckt.client_id = client_id;
+    pckt.opcode = OBOS_AUD_SET_NAME;
+    pckt.payload_len = strlen(name);
+    pckt.cpayload = name;
+    pckt.transmission_id_valid = false;
+    int res = autrans_transmit(fd, &pckt);
+    if (res < 0)
+        return res;
+
+    aud_packet reply = {};
+    res = autrans_receive(fd, &reply, NULL, NULL);
+    if (res < 0)
+        return res;
+
+    if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+    {
+        free(reply.payload);
+        return 0;
+    }
+    
+    if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+    {
+        fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+        if (reply.payload_len)
+            fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+    }
+    else
+        fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+    free(reply.payload);
+    return -1;
+}
+
 int autrans_disconnect(int fd, uint32_t client_id)
 {
     aud_packet pckt = {.opcode=OBOS_AUD_DISCONNECT_REQUEST,.client_id=client_id};
     return autrans_transmit(fd, &pckt);
 }
+
 int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id)
 {
     aud_query_output_device_payload payload = {.output_id=output_id};
@@ -189,7 +229,6 @@ int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_
     *transmission_id = pckt.transmission_id;
     return ret;
 }
-
 
 int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags)
 {
@@ -611,6 +650,21 @@ int autrans_open_addr(struct sockaddr* addr, socklen_t addr_len)
         return res;
     }
     return sock;
+}
+
+char* autrans_make_name(const char* name, bool take_basename)
+{
+    char* res = NULL;
+    int len = 0;
+
+    if (take_basename)
+        name = basename(name);
+
+    len = snprintf(res, len, "%s <%d>", name, getpid())+1;
+    res = malloc(len+1);
+    snprintf(res, len, "%s <%d>", name, getpid());
+
+    return res;
 }
 
 const char* autrans_opcode_to_string(uint32_t opcode)

@@ -193,6 +193,7 @@ typedef struct aud_packet
 int autrans_transmit(int fd, aud_packet* pckt);
 int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockaddr_len);
 int autrans_initial_connection_request(int fd);
+int autrans_set_name(int fd, uint32_t client_id, const char* name);
 int autrans_stream_open(int fd, uint32_t client_id, const aud_open_stream_payload* payload, uint16_t* stream_id, uint32_t* stream_flags);
 // *flags is set to the real flags on return.
 int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags);
@@ -214,6 +215,12 @@ int autrans_open();
  */
 int autrans_open_uri(const char* addr);
 int autrans_open_addr(struct sockaddr* addr, socklen_t addr_len);
+
+/* makes a name for the current client that
+ * looks something like:
+ * (whatever name is) <pid>
+ */
+char* autrans_make_name(const char* name, bool take_basename);
 
 const char* autrans_opcode_to_string(uint32_t opcode);
 
