@@ -455,6 +455,7 @@ void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet*
         curr_desc->sizeof_desc = name_len + sizeof(struct aud_connection_desc);
         curr_desc->client_id = curr->client_id;
         memcpy(curr_desc->name, curr->name, name_len);        
+        reply->desc_count++;
 
         curr = curr->next;
         curr_desc = autrans_next_connection_desc(curr_desc);
