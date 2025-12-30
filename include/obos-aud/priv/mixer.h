@@ -43,6 +43,7 @@ typedef struct mixer_output_device {
     int channels;
     int format_size;
     float volume;
+    int buffer_samples;
     pthread_t worker;
 } mixer_output_device;
 

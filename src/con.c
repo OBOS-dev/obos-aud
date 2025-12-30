@@ -434,6 +434,7 @@ void obos_aud_process_output_device_query_parameters(obos_aud_connection* client
     reply_payload.params.sample_rate = dev->sample_rate;
     reply_payload.params.format_size = dev->format_size;
     reply_payload.input_channels = dev->input_channels;
+    reply_payload.buffer_samples = dev->buffer_samples;
     reply_payload.volume = dev->volume;
 
     aud_packet resp = {};
