@@ -40,6 +40,7 @@ enum aud_opcode {
     OBOS_AUD_SET_NAME, /* sets the user-readable name of the current connection */
     OBOS_AUD_QUERY_CONNECTIONS,
     OBOS_AUD_QUERY_OUTPUT_PARAMETERS,
+    OBOS_AUD_OUTPUT_SET_BUFFER_SAMPLES,
 
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
@@ -116,9 +117,9 @@ typedef struct aud_query_connections_reply {
 
 typedef struct aud_query_output_parameters_reply {
     aud_output_parameters params;
-    int input_channels;
+    int32_t input_channels;
     float volume;
-    int buffer_samples;
+    int32_t buffer_samples;
 } PACK aud_query_output_parameters_reply;
 
 /* Payload structures */
@@ -172,6 +173,11 @@ typedef struct aud_stream_get_flags_payload {
 typedef struct aud_set_name_payload {
     char name[];
 } aud_set_name_payload;
+
+typedef struct aud_set_output_buffer_samples_payload {
+    uint16_t output_id;
+    int32_t buffer_samples; 
+} aud_set_output_buffer_samples_payload;
 
 /***************************************************/
 
