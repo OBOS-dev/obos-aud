@@ -118,6 +118,7 @@ typedef struct aud_query_output_parameters_reply {
     aud_output_parameters params;
     int input_channels;
     float volume;
+    int buffer_samples;
 } PACK aud_query_output_parameters_reply;
 
 /* Payload structures */
