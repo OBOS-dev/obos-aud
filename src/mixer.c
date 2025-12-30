@@ -358,7 +358,11 @@ static void* mixer_worker(void* arg)
                         samples_per_channel += additional_samples_per_channel;
                     }
                     for (int idx = 0; idx < samples_this_channel; idx++)
+                    {
                         condensed_samples[c] += samples[sample_idx++];
+                        // samples without audio should be ignored in the final division
+                        samples_this_channel--;
+                    }
                     condensed_samples[c] /= samples_this_channel;
                     
                     condensed_samples[c] = clamp(condensed_samples[c], -1, 1);
