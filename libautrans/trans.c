@@ -579,6 +579,47 @@ int autrans_connection_set_volume(int socket, uint32_t client_id, uint32_t tgt, 
 int autrans_connection_get_volume(int socket, uint32_t client_id, uint32_t tgt, float* volume)
     volume_get_common(socket, client_id, tgt, 32, OBOS_AUD_CONNECTION_GET_VOLUME, volume)
 
+int autrans_output_set_buffer_samples(int socket, uint32_t client_id, uint16_t output_id, int32_t new_sample_count)
+{
+    do {
+        aud_set_output_buffer_samples_payload payload = {.output_id=output_id,.buffer_samples=new_sample_count};
+        aud_packet pckt = {};
+        aud_packet reply = {};
+        pckt.opcode = OBOS_AUD_OUTPUT_SET_BUFFER_SAMPLES;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if (autrans_transmit(socket, &pckt) < 0)
+            return -1;
+
+        const uint32_t transmission_id = pckt.transmission_id;
+
+        if (autrans_receive(socket, &reply, NULL, 0) < 0)
+            return -1;
+
+        if (transmission_id != reply.transmission_id)
+        {
+            fprintf(stderr, "Unexpected transmission ID in server reply.\n");
+            return -1;
+        }
+
+        if (reply.opcode == OBOS_AUD_STATUS_REPLY_OK)
+            break;
+
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While opening stream: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While opening stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
+    return 0;
+}
+
 int autrans_open()
 {
     return autrans_open_uri(getenv("AUD_DISPLAY"));

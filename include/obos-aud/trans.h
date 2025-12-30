@@ -219,6 +219,7 @@ int autrans_stream_set_volume(int socket, uint32_t client_id, uint16_t stream_id
 int autrans_stream_get_volume(int socket, uint32_t client_id, uint16_t stream_id, float* volume);
 int autrans_output_set_volume(int socket, uint32_t client_id, uint16_t output_id, float volume);
 int autrans_output_get_volume(int socket, uint32_t client_id, uint16_t output_id, float* volume);
+int autrans_output_set_buffer_samples(int socket, uint32_t client_id, uint16_t output_id, int32_t new_sample_count);
 int autrans_connection_set_volume(int socket, uint32_t client_id, uint32_t tgt, float volume);
 int autrans_connection_get_volume(int socket, uint32_t client_id, uint32_t tgt, float* volume);
 int autrans_disconnect(int fd, uint32_t client_id);
