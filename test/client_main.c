@@ -21,7 +21,7 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 
-const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-f format] [-o output_id] input_file\n";
+const char* usage = "%s [-d display_uri] [-c channels] [-s sample_rate] [-f format] [-o output_id] [-h] input_file\n";
 
 static int get_format(const char* fmt)
 {
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     int format_flags = 0;
     uint16_t output = OBOS_AUD_DEFAULT_OUTPUT_DEV;
 
-    while ((opt = getopt(argc, argv, "+hs:c:v:d:f:o:")) != -1)
+    while ((opt = getopt(argc, argv, "hs:c:v:d:f:o:")) != -1)
     {
         switch (opt)
         {
