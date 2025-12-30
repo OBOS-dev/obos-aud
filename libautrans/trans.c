@@ -18,6 +18,8 @@
 #include <time.h>
 #include <errno.h>
 
+#include <sys/param.h>
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netdb.h>
@@ -228,6 +230,42 @@ int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_
     int ret = autrans_transmit(fd, &pckt);
     *transmission_id = pckt.transmission_id;
     return ret;
+}
+int autrans_query_output_parameters(int fd, uint32_t client_id, uint16_t output_id, aud_query_output_parameters_reply* oreply)
+{
+    aud_query_output_parameters_payload payload = {.output_id=output_id};
+    aud_packet pckt = {
+        .opcode = OBOS_AUD_QUERY_OUTPUT_PARAMETERS,
+        .client_id = client_id,
+        .payload = &payload,
+        .payload_len = sizeof(payload),
+    };
+    int res = autrans_transmit(fd, &pckt);
+    if (res < 0)
+        return res;
+
+    aud_packet reply = {};
+    res = autrans_receive(fd, &reply, NULL, NULL);
+    if (res < 0)
+        return res;
+
+    if (__builtin_expect(reply.opcode == OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY, true))
+    {
+        memcpy(oreply, reply.payload, MIN(sizeof(*oreply), reply.payload_len));
+        free(reply.payload);
+        return 0;
+    }
+    
+    if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+    {
+        fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+        if (reply.payload_len)
+            fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+    }
+    else
+        fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+    free(reply.payload);
+    return -1;
 }
 
 int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_desc** descs, size_t *desc_count)

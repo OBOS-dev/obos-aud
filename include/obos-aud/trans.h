@@ -216,6 +216,7 @@ int autrans_connection_set_volume(int socket, uint32_t client_id, uint32_t tgt, 
 int autrans_connection_get_volume(int socket, uint32_t client_id, uint32_t tgt, float* volume);
 int autrans_disconnect(int fd, uint32_t client_id);
 int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id);
+int autrans_query_output_parameters(int fd, uint32_t client_id, uint16_t output_id, aud_query_output_parameters_reply* reply);
 int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_desc** descs, size_t *desc_count);
 
 int autrans_open();
