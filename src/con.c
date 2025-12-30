@@ -495,20 +495,24 @@ void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet*
     size_t len = sizeof(aud_query_connections_reply);
     for (obos_aud_connection* curr = g_connections.head; curr; )
     {
-        len += strlen(curr->name);
+        len += curr->name ? strlen(curr->name) : (sizeof("unknown")-1);
         len += sizeof(struct aud_connection_desc);
 
         curr = curr->next;
     }
     aud_query_connections_reply* reply = malloc(len);
+    memset(reply, 0, sizeof(*reply));
     reply->arr_offset = offsetof(aud_query_connections_reply, descs);
     struct aud_connection_desc* curr_desc = reply->descs;
     for (obos_aud_connection* curr = g_connections.head; curr; )
     {
-        size_t name_len = strlen(curr->name);
+        size_t name_len = curr->name ? strlen(curr->name) : (sizeof("unknown")-1);
         curr_desc->sizeof_desc = name_len + sizeof(struct aud_connection_desc);
         curr_desc->client_id = curr->client_id;
-        memcpy(curr_desc->name, curr->name, name_len);        
+        if (curr->name)
+            memcpy(curr_desc->name, curr->name, name_len);        
+        else
+            memcpy(curr_desc->name, "unknown", name_len);
         reply->desc_count++;
 
         curr = curr->next;
@@ -517,7 +521,7 @@ void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet*
     pthread_mutex_unlock(&g_connections.lock);
 
     aud_packet resp = {};
-    resp.opcode = OBOS_AUD_QUERY_OUTPUT_DEVICE_REPLY;
+    resp.opcode = OBOS_AUD_QUERY_CONNECTIONS;
     resp.client_id = client->client_id;
     resp.payload = reply;
     resp.payload_len = len;
