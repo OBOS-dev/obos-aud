@@ -110,7 +110,7 @@ typedef struct aud_query_connections_reply {
     uint32_t arr_offset;
     uint32_t desc_count;
     struct aud_connection_desc descs[];
-} PACK aud_query_connections_reply;
+} ALIGNAS(8) aud_query_connections_reply;
 
 /* Payload structures */
 /**************************************************/

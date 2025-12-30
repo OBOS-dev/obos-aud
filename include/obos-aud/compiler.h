@@ -37,6 +37,7 @@
 #define aud_hton64(x) aud_ntoh64(x)
 
 #define PACK __attribute__((packed))
+#define ALIGNAS(x) __attribute__((aligned(x)))
 #define WEAK __attribute__((weak))
 
 #define STRINGIFY_PROTO(x) #x
