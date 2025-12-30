@@ -542,7 +542,7 @@ int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_str
             return -1;\
         }\
 \
-        if (reply.opcode == OBOS_AUD_STREAM_GET_FLAGS_REPLY)\
+        if (reply.opcode == OBOS_AUD_GET_VOLUME_REPLY)\
         {\
             aud_get_volume_reply* reply_payload = reply.payload;\
             *volume = reply_payload->volume;\
