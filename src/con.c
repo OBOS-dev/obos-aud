@@ -447,6 +447,27 @@ void obos_aud_process_output_device_query_parameters(obos_aud_connection* client
     autrans_transmit(client->fd, &resp);
 }
 
+void obos_aud_process_output_set_buffer_samples(obos_aud_connection* client, aud_packet* pckt)
+{
+    if (pckt->payload_len != sizeof(aud_set_output_buffer_samples_payload))
+    {
+        inval_status(client, pckt, "Invalid payload length.");
+        return;
+    }
+
+    aud_set_output_buffer_samples_payload* payload = pckt->payload;
+    mixer_output_device* dev = mixer_output_from_id(payload->output_id);
+    if (!dev)
+    {
+        inval_status(client, pckt, "Invalid output ID.");
+        return;
+    }
+
+    dev->buffer_samples = payload->buffer_samples;
+
+    ok_status(client, pckt);
+}
+
 void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt)
 {
     if (pckt->payload_len == 0)
