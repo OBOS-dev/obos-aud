@@ -242,6 +242,7 @@ int main(int argc, char** argv)
         fprintf(stderr, "Server does not support one or more passed flags\n");
         goto die;
     }
+
     switch (format_flags) {
         case OBOS_AUD_STREAM_FLAGS_ALAW_DECODE:
         case OBOS_AUD_STREAM_FLAGS_ULAW_DECODE:
@@ -288,7 +289,7 @@ int main(int argc, char** argv)
         }
         else
             fprintf(stderr, "While writing to stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
-        free(reply.payload);        
+        free(reply.payload);
     }
     if (avail < 0)
         perror("read");
