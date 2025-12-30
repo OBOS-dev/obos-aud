@@ -175,6 +175,12 @@ int autrans_stream_open(int fd, uint32_t client_id, const aud_open_stream_payloa
 // *flags is set to the real flags on return.
 int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags);
 int autrans_stream_data(int socket, uint32_t client_id, uint16_t stream_id, const void* data, size_t len);
+int autrans_stream_set_volume(int socket, uint32_t client_id, uint16_t stream_id, float volume);
+int autrans_stream_get_volume(int socket, uint32_t client_id, uint16_t stream_id, float* volume);
+int autrans_output_set_volume(int socket, uint32_t client_id, uint16_t output_id, float volume);
+int autrans_output_get_volume(int socket, uint32_t client_id, uint16_t output_id, float* volume);
+int autrans_connection_set_volume(int socket, uint32_t client_id, uint32_t tgt, float volume);
+int autrans_connection_get_volume(int socket, uint32_t client_id, uint32_t tgt, float* volume);
 int autrans_disconnect(int fd, uint32_t client_id);
 int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id);
 

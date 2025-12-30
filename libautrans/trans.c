@@ -314,7 +314,6 @@ int autrans_stream_data(int socket, uint32_t client_id, uint16_t stream_id, cons
 int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_stream_payload* stream_info, uint16_t* stream_id, uint32_t* stream_flags)
 {
     do {
-
         aud_packet pckt = {};
         aud_packet reply = {};
         pckt.opcode = OBOS_AUD_OPEN_STREAM;
@@ -359,6 +358,107 @@ int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_str
         return autrans_stream_flags(socket, client_id, *stream_id, stream_flags);
     return 0;
 }
+
+#define volume_set_common(socket, client_id, tgt, prefix, opcode_val, volume) \
+{\
+    do {\
+        aud_set_volume_payload payload = {.obj_id##prefix=tgt,.volume=volume};\
+        aud_packet pckt = {};\
+        aud_packet reply = {};\
+        pckt.opcode = opcode_val;\
+        pckt.client_id = client_id;\
+        pckt.payload = &payload;\
+        pckt.payload_len = sizeof(payload);\
+        if (autrans_transmit(socket, &pckt) < 0)\
+            return -1;\
+\
+        const uint32_t transmission_id = pckt.transmission_id;\
+\
+        if (autrans_receive(socket, &reply, NULL, 0) < 0)\
+            return -1;\
+\
+        if (transmission_id != reply.transmission_id)\
+        {\
+            fprintf(stderr, "Unexpected transmission ID in server reply.\n");\
+            return -1;\
+        }\
+\
+        if (reply.opcode == OBOS_AUD_STATUS_REPLY_OK)\
+            break;\
+\
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)\
+        {\
+            fprintf(stderr, "While opening stream: %s\n", autrans_opcode_to_string(reply.opcode));\
+            if (reply.payload_len)\
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);\
+        }\
+        else\
+            fprintf(stderr, "While opening stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);\
+        free(reply.payload);\
+        return -1;\
+    } while(0);\
+    return 0;\
+}
+#define volume_get_common(socket, client_id, tgt, prefix, opcode_val, volume) \
+{\
+    do {\
+        aud_get_volume_payload payload = {.obj_id##prefix=tgt};\
+        aud_packet pckt = {};\
+        aud_packet reply = {};\
+        pckt.opcode = opcode_val;\
+        pckt.client_id = client_id;\
+        pckt.payload = &payload;\
+        pckt.payload_len = sizeof(payload);\
+        if (autrans_transmit(socket, &pckt) < 0)\
+            return -1;\
+\
+        const uint32_t transmission_id = pckt.transmission_id;\
+\
+        if (autrans_receive(socket, &reply, NULL, 0) < 0)\
+            return -1;\
+\
+        if (transmission_id != reply.transmission_id)\
+        {\
+            fprintf(stderr, "Unexpected transmission ID in server reply.\n");\
+            return -1;\
+        }\
+\
+        if (reply.opcode == OBOS_AUD_STREAM_GET_FLAGS_REPLY)\
+        {\
+            aud_get_volume_reply* reply_payload = reply.payload;\
+            *volume = reply_payload->volume;\
+            free(reply.payload);\
+            break;\
+        }\
+\
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)\
+        {\
+            fprintf(stderr, "While opening stream: %s\n", autrans_opcode_to_string(reply.opcode));\
+            if (reply.payload_len)\
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);\
+        }\
+        else\
+            fprintf(stderr, "While opening stream: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);\
+        free(reply.payload);\
+        return -1;\
+    } while(0);\
+    return 0;\
+}
+
+int autrans_stream_set_volume(int socket, uint32_t client_id, uint16_t stream_id, float volume)
+    volume_set_common(socket, client_id, stream_id, , OBOS_AUD_STREAM_SET_VOLUME, volume)
+int autrans_stream_get_volume(int socket, uint32_t client_id, uint16_t stream_id, float* volume)
+    volume_get_common(socket, client_id, stream_id, , OBOS_AUD_STREAM_GET_VOLUME, volume)
+
+int autrans_output_set_volume(int socket, uint32_t client_id, uint16_t output_id, float volume)
+    volume_set_common(socket, client_id, output_id, , OBOS_AUD_OUTPUT_SET_VOLUME, volume)
+int autrans_output_get_volume(int socket, uint32_t client_id, uint16_t output_id, float* volume)
+    volume_get_common(socket, client_id, output_id, , OBOS_AUD_OUTPUT_GET_VOLUME, volume)
+
+int autrans_connection_set_volume(int socket, uint32_t client_id, uint32_t tgt, float volume)
+    volume_set_common(socket, client_id, tgt, 32, OBOS_AUD_CONNECTION_SET_VOLUME, volume)
+int autrans_connection_get_volume(int socket, uint32_t client_id, uint32_t tgt, float* volume)
+    volume_get_common(socket, client_id, tgt, 32, OBOS_AUD_CONNECTION_GET_VOLUME, volume)
 
 int autrans_open()
 {
