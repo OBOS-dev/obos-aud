@@ -377,10 +377,10 @@ int main(int argc, char** argv)
                     obos_aud_process_conn_set_volume(con, &curr->pckt);
                     break;
                 case OBOS_AUD_OUTPUT_GET_VOLUME:
-                    obos_aud_process_conn_get_volume(con, &curr->pckt);
+                    obos_aud_process_output_get_volume(con, &curr->pckt);
                     break;
                 case OBOS_AUD_OUTPUT_SET_VOLUME:
-                    obos_aud_process_conn_set_volume(con, &curr->pckt);
+                    obos_aud_process_output_set_volume(con, &curr->pckt);
                     break;
                 case OBOS_AUD_SET_NAME:
                     obos_aud_process_set_name(con, &curr->pckt);
