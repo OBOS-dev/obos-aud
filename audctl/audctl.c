@@ -78,6 +78,10 @@ int main(int argc, char** argv)
     }
     client_id = reply.client_id;
 
+    char* name = autrans_make_name(argv[0], true);
+    autrans_set_name(socket, client_id, name);
+    free(name);
+
     const char* command = argv[optind];
     const char* const* command_argv = (optind+1) < argc ? (const char**)&argv[optind+1] : NULL;
     size_t command_argc = argc - (optind+1);
@@ -174,6 +178,19 @@ int main(int argc, char** argv)
 
         if (autrans_connection_get_volume(socket, client_id, connection_id, &volume) == 0)
             print_volume(volume);
+    }
+    else if (strcasecmp(command, "get-connections") == 0)
+    {
+        struct aud_connection_desc* descs = NULL;
+        size_t desc_count = 0;
+        if (autrans_query_connections(socket, client_id, &descs, &desc_count) < 0)
+            goto die;
+
+        struct aud_connection_desc* curr = descs;
+        for (size_t i = 0; i < desc_count; i++, curr = autrans_next_connection_desc(curr))
+            printf("connection 0x%x \"%.*s\"%s\n", curr->client_id, (int)(curr->sizeof_desc - sizeof(*curr)), curr->name, curr->client_id == client_id ? " (us)" : "");
+
+        free(descs);
     }
     else
     {
