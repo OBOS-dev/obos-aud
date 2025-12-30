@@ -230,6 +230,48 @@ int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_
     return ret;
 }
 
+int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_desc** descs, size_t *desc_count)
+{
+    if (!descs || !desc_count)
+        return -1;
+
+    aud_packet pckt = {};
+    pckt.client_id = client_id;
+    pckt.opcode = OBOS_AUD_QUERY_CONNECTIONS;
+    pckt.payload_len = 0;
+    pckt.cpayload = NULL;
+    pckt.transmission_id_valid = false;
+    int res = autrans_transmit(fd, &pckt);
+    if (res < 0)
+        return res;
+
+    aud_packet reply = {};
+    res = autrans_receive(fd, &reply, NULL, NULL);
+    if (res < 0)
+        return res;
+
+    if (__builtin_expect(reply.opcode == OBOS_AUD_QUERY_CONNECTIONS, true))
+    {
+        aud_query_connections_reply* payload = reply.payload;
+        *desc_count = payload->desc_count;
+        *descs = malloc(reply.payload_len - payload->arr_offset);
+        memcpy(*descs, ((char*)payload) + payload->arr_offset, reply.payload_len - payload->arr_offset);
+        free(payload);
+        return 0;
+    }
+    
+    if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+    {
+        fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+        if (reply.payload_len)
+            fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+    }
+    else
+        fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+    free(reply.payload);
+    return -1;
+}
+
 int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags)
 {
     int res = 0;
