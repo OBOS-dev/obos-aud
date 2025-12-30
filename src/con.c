@@ -447,6 +447,7 @@ void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet*
         curr = curr->next;
     }
     aud_query_connections_reply* reply = malloc(len);
+    reply->arr_offset = offsetof(aud_query_connections_reply, descs);
     struct aud_connection_desc* curr_desc = reply->descs;
     for (obos_aud_connection* curr = g_connections.head; curr; )
     {

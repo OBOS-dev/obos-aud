@@ -107,6 +107,7 @@ struct aud_connection_desc {
 
 #define autrans_next_connection_desc(desc) ((struct aud_connection_desc*)((uintptr_t)desc + desc->sizeof_desc))
 typedef struct aud_query_connections_reply {
+    uint32_t arr_offset;
     struct aud_connection_desc descs[];
 } PACK aud_query_connections_reply;
 
