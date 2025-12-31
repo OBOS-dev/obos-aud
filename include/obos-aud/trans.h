@@ -41,6 +41,7 @@ enum aud_opcode {
     OBOS_AUD_QUERY_CONNECTIONS,
     OBOS_AUD_QUERY_OUTPUT_PARAMETERS,
     OBOS_AUD_OUTPUT_SET_BUFFER_SAMPLES,
+    OBOS_AUD_SET_DEFAULT_OUTPUT,
 
     OBOS_AUD_REQUEST_REPLY_BEGIN = 0x1000,
     OBOS_AUD_INITIAL_CONNECTION_REPLY,
@@ -148,6 +149,10 @@ typedef union aud_get_volume_payload {
     uint16_t obj_id;
     uint32_t obj_id32;
 } PACK aud_get_volume_payload;
+
+typedef struct aud_set_default_output_payload {
+    uint32_t output_id;
+} aud_set_default_output_payload;
 
 typedef struct aud_close_stream_payload {
     uint16_t stream_id;
