@@ -258,8 +258,6 @@ float mixer_output_get_volume(mixer_output_device* dev)
     return mixer_get_volume(dev->volume);
 }
 
-float mixer_output_get_volume(mixer_output_device* dev);
-
 #ifdef __obos__
 #   include <obos/syscall.h>
 #endif
