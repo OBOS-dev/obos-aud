@@ -398,6 +398,26 @@ int main(int argc, char** argv)
 
         printf("set buffer size to %d sample%c (%f seconds)\n", samples, samples != 1 ? 's' : '\0', time);
     }
+    else if (strcasecmp(command, "set-default-output") == 0)
+    {
+        if (command_argc < 1)
+        {
+            fprintf(stderr, "set-default-output output_id\n");
+            goto die;
+        }
+
+        uint16_t output_id = OBOS_AUD_DEFAULT_OUTPUT_DEV;
+        errno = 0;
+        output_id = strtoul(command_argv[0], NULL, 0);
+        if (errno != 0)
+        {
+            fprintf(stderr, "Expected unsigned integer, got %s\n", command_argv[0]);
+            goto die;
+        }
+
+        if (autrans_set_default_output(socket, client_id, output_id) == 0)
+            printf("default output set to output 0x%x\n", output_id);
+    }
     else if (strcasecmp(command, "help") == 0)
     {
         printf("Valid commands:\n");
@@ -410,6 +430,7 @@ int main(int argc, char** argv)
         printf("  output-query-parameters [output_id]: Queries an output's parameters.\n");
         printf("  output-set-buffer-size-samples [output_id] samples: Sets an output's buffer size in samples.\n");
         printf("  output-set-buffer-size-seconds [output_id] seconds: Sets an output's buffer size in seconds.\n");
+        printf("  set-default-output output_id: Sets the server's default output.\n");
         printf("  help: Prints this message.\n");
     }
     else
