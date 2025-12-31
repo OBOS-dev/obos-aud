@@ -459,8 +459,9 @@ void obos_aud_process_set_name(obos_aud_connection* client, aud_packet* pckt)
     }
 
     aud_set_name_payload* payload = pckt->payload;
-    client->name = memcpy(malloc(pckt->payload_len+1), payload->name, pckt->payload_len);
-    client->name[pckt->payload_len] = 0;
+    size_t name_len = pckt->payload_len - sizeof(*payload);
+    client->name = memcpy(malloc(name_len+1), payload->name, name_len);
+    client->name[name_len] = 0;
 
     ok_status(client, pckt);    
 }
