@@ -417,7 +417,7 @@ void obos_aud_process_output_device_query_parameters(obos_aud_connection* client
     reply_payload.params.format_size = dev->format_size;
     reply_payload.input_channels = dev->input_channels;
     reply_payload.buffer_samples = dev->buffer_samples;
-    reply_payload.volume = dev->volume;
+    reply_payload.volume = mixer_output_get_volume(dev);
 
     aud_packet resp = {};
     resp.opcode = OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY;
