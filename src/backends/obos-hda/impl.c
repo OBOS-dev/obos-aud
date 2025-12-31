@@ -442,6 +442,8 @@ int aud_backend_output_play(int output_id, bool play)
     }
 
     ret = ioctl(output->dev, IOCTL_HDA_STREAM_PLAY, &play);
+    if (!play)
+        ioctl(output->dev, IOCTL_HDA_STREAM_CLEAR_QUEUE);
 
     pthread_mutex_unlock(&s_mutexes[output->dev_idx]);
     return ret;
