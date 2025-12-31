@@ -229,6 +229,7 @@ int autrans_disconnect(int fd, uint32_t client_id);
 int autrans_query_output(int fd, uint32_t client_id, uint16_t output_id, uint32_t *transmission_id);
 int autrans_query_output_parameters(int fd, uint32_t client_id, uint16_t output_id, aud_query_output_parameters_reply* reply);
 int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_desc** descs, size_t *desc_count);
+int autrans_set_default_output(int fd, uint32_t client_id, uint16_t output_id);
 
 int autrans_open();
 /*

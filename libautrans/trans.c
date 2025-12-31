@@ -315,6 +315,44 @@ int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_
     return -1;
 }
 
+int autrans_set_default_output(int socket, uint32_t client_id, uint16_t output_id)
+{
+    int res = 0;
+    do {
+        aud_set_default_output_payload payload = {};
+        payload.output_id = output_id;
+
+        aud_packet reply = {};
+        aud_packet pckt = {};
+        pckt.opcode = OBOS_AUD_SET_DEFAULT_OUTPUT;
+        pckt.client_id = client_id;
+        pckt.payload = &payload;
+        pckt.payload_len = sizeof(payload);
+        if (autrans_transmit(socket, &pckt) < 0)
+        {
+            perror("autrans_transmit");
+            return -1;
+        }
+    
+        if ((res = autrans_receive(socket, &reply, NULL, 0)) < 0)
+            break;
+        if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
+            continue;
+    
+        if (reply.opcode >= OBOS_AUD_STATUS_REPLY_OK && reply.opcode < OBOS_AUD_STATUS_REPLY_CEILING)
+        {
+            fprintf(stderr, "While setting stream flags: %s\n", autrans_opcode_to_string(reply.opcode));
+            if (reply.payload_len)
+                fprintf(stderr, "Extra info: %.*s\n", reply.payload_len, (char*)reply.payload);
+        }
+        else
+            fprintf(stderr, "While setting stream flags: Unexpected %s from server (payload length=%d)\n", autrans_opcode_to_string(reply.opcode), reply.payload_len);
+        free(reply.payload);
+        return -1;
+    } while(0);
+    return res;
+}
+
 int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uint32_t* flags)
 {
     int res = 0;
@@ -331,8 +369,6 @@ int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uin
         pckt.payload_len = sizeof(payload);
         if (autrans_transmit(socket, &pckt) < 0)
         {
-            shutdown(socket, SHUT_RDWR);
-            close(socket);
             perror("autrans_transmit");
             return -1;
         }
@@ -365,8 +401,6 @@ int autrans_stream_flags(int socket, uint32_t client_id, uint16_t stream_id, uin
         pckt.payload_len = sizeof(payload);
         if ((res = autrans_transmit(socket, &pckt)) < 0)
         {
-            shutdown(socket, SHUT_RDWR);
-            close(socket);
             perror("autrans_transmit");
             return res;
         }
@@ -412,8 +446,6 @@ int autrans_stream_data(int socket, uint32_t client_id, uint16_t stream_id, cons
     pckt.payload_len = len+sizeof(aud_data_payload);
     if (autrans_transmit(socket, &pckt) < 0)
     {
-        shutdown(socket, SHUT_RDWR);
-        close(socket);
         perror("autrans_transmit");
         return -1;
     }
