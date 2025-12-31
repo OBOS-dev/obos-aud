@@ -192,12 +192,19 @@ int autrans_set_name(int fd, uint32_t client_id, const char* name)
     pckt.transmission_id_valid = false;
     int res = autrans_transmit(fd, &pckt);
     if (res < 0)
+    {
+        free(payload);
         return res;
+    }
 
     aud_packet reply = {};
     res = autrans_receive(fd, &reply, NULL, NULL);
     if (res < 0)
+    {
+        free(payload);
         return res;
+    }
+    free(payload);
 
     if (__builtin_expect(reply.opcode == OBOS_AUD_STATUS_REPLY_OK, true))
     {
