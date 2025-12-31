@@ -445,14 +445,14 @@ int main(int argc, char** argv)
                         ok_status.transmission_id = curr->pckt.transmission_id;
                         ok_status.transmission_id_valid = true;
                         autrans_transmit(curr->fd, &ok_status);
+                        do_not_free = true;
                         if (data == curr->decoded_data.buf)
-                        {
-                            do_not_free = true;
-                            free(curr);
                             free((void*)data);
-                        }
+                        else
+                            free(payload);
                         if (!(--stream->refs) && stream->should_free)
                             free(stream);
+                        free(curr);
                     }
                     else
                     {
