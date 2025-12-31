@@ -39,6 +39,7 @@ int autrans_transmit(int fd, aud_packet* pckt)
     }
 
     aud_header* hdr = malloc(pckt->payload_len+sizeof(*hdr));
+    assert(hdr);
     memset(hdr, 0, sizeof(*hdr));
 
     hdr->magic = aud_hton32(OBOS_AUD_HEADER_MAGIC);
@@ -148,9 +149,19 @@ int autrans_receive(int fd, aud_packet* pckt, void* sockaddr, socklen_t *sockadd
         void* sink = malloc(hdr.data_offset - sizeof(hdr));
         err = TEMP_FAILURE_RETRY(recv(fd, sink, hdr.data_offset - sizeof(hdr), MSG_WAITALL));
         if (err < 0)
+        {
+            free(sink);
+            free(pckt->payload);
+            pckt->payload = NULL;
+            pckt->payload_len = 0;
             return err;
+        }
         if (err == 0)
         {
+            free(sink);
+            free(pckt->payload);
+            pckt->payload = NULL;
+            pckt->payload_len = 0;
             errno = ECONNRESET;
             return -1;
         }
@@ -263,6 +274,11 @@ int autrans_query_output_parameters(int fd, uint32_t client_id, uint16_t output_
 
     if (__builtin_expect(reply.opcode == OBOS_AUD_QUERY_OUTPUT_PARAMETERS_REPLY, true))
     {
+        if (reply.payload_len < sizeof(aud_query_output_parameters_reply))
+        {
+            fprintf(stderr, "While opening stream: Invalid reply payload length! (got 0 bytes, expected %ld bytes)\n", sizeof(aud_query_output_parameters_reply));\
+            return -1;
+        }
         memcpy(oreply, reply.payload, MIN(sizeof(*oreply), reply.payload_len));
         free(reply.payload);
         return 0;
@@ -302,6 +318,11 @@ int autrans_query_connections(int fd, uint32_t client_id, struct aud_connection_
 
     if (__builtin_expect(reply.opcode == OBOS_AUD_QUERY_CONNECTIONS, true))
     {
+        if (reply.payload_len < sizeof(aud_query_connections_reply))
+        {
+            fprintf(stderr, "While opening stream: Invalid reply payload length! (got 0 bytes, expected at least %ld bytes)\n", sizeof(aud_query_connections_reply));\
+            return -1;
+        }
         aud_query_connections_reply* payload = reply.payload;
         *desc_count = payload->desc_count;
         *descs = malloc(reply.payload_len - payload->arr_offset);
@@ -499,6 +520,11 @@ int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_str
 
         if (reply.opcode == OBOS_AUD_OPEN_STREAM_REPLY)
         {
+            if (reply.payload_len < sizeof(aud_open_stream_reply))
+            {
+                fprintf(stderr, "While opening stream: Invalid reply payload length! (got 0 bytes, expected at least %ld bytes)\n", sizeof(aud_open_stream_reply));\
+                return -1;
+            }
             aud_open_stream_reply *payload = reply.payload;
             *stream_id = payload->stream_id;
             free(payload);
@@ -582,12 +608,18 @@ int autrans_stream_open(int socket, const uint32_t client_id, const aud_open_str
 \
         if (transmission_id != reply.transmission_id)\
         {\
+            free(reply.payload);\
             fprintf(stderr, "Unexpected transmission ID in server reply.\n");\
             return -1;\
         }\
 \
         if (reply.opcode == OBOS_AUD_GET_VOLUME_REPLY)\
         {\
+            if (reply.payload_len != sizeof(aud_get_volume_payload))\
+            {\
+                fprintf(stderr, "While opening stream: Invalid reply payload length! (got 0 bytes, expected %ld bytes)\n", sizeof(aud_get_volume_payload));\
+                return -1;\
+            }\
             aud_get_volume_reply* reply_payload = reply.payload;\
             *volume = reply_payload->volume;\
             free(reply.payload);\
@@ -788,6 +820,7 @@ int autrans_open_uri(const char* addr)
 
     socklen_t addr_len = sizeof(sa_family_t)+strlen(path)+1;
     struct sockaddr* saddr = malloc(addr_len);
+    assert(saddr);
     saddr->sa_family = AF_UNIX;
     memcpy(saddr->sa_data, path, addr_len-sizeof(sa_family_t));
 

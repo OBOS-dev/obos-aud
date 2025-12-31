@@ -144,6 +144,7 @@ bool aud_stream_push_no_decode(aud_stream* stream, const void* data, size_t len,
 
 static int16_t read_sample(const int16_t* buffer, int channel, int channels, size_t buffer_len, float idx)
 {
+    assert(buffer);
     return buffer[((int)idx)*channels + channel];
 }
 
@@ -168,6 +169,7 @@ bool aud_stream_push(aud_stream* stream, const void* buf, size_t len, bool block
     else if (stream->flags & OBOS_AUD_STREAM_FLAGS_F32_DECODE)
         newlen /= (32.f/16.f);
     int16_t* decoded = malloc(newlen);
+    assert(decoded);
     if (stream->flags & OBOS_AUD_STREAM_FLAGS_ULAW_DECODE)
     {
         const uint8_t* data = buf;
@@ -215,6 +217,7 @@ bool aud_stream_push(aud_stream* stream, const void* buf, size_t len, bool block
         float new_sample_count = ceilf(sample_count / isamples_per_osample);
         size_t new_buf_len = new_sample_count * stream->channels * sizeof(int16_t);
         int16_t* new_buf = malloc(new_buf_len);
+        assert(new_buf);
         for (int channel = 0; channel < stream->channels; channel++)
         {
             for (float i = 0; (i / isamples_per_osample) < new_sample_count; i += isamples_per_osample)

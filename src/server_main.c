@@ -153,6 +153,8 @@ int main(int argc, char** argv)
 
     struct pollfd *fds = calloc(3, sizeof(struct pollfd));
     size_t nToPoll = 0;
+    if (!fds)
+        abort();
 
     struct sockaddr_in ip_addr = {};
     if (inet_pton(AF_INET, bind_address, &ip_addr) != 1)
@@ -546,6 +548,8 @@ int main(int argc, char** argv)
 static struct packet_node* receive_packet(int fd)
 {
     struct packet_node* node = calloc(1, sizeof(struct packet_node));
+    if (!node)
+        abort();
     if (autrans_receive(fd, &node->pckt, NULL, 0) != 0)
     {
         free(node);

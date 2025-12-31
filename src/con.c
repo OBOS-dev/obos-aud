@@ -81,6 +81,7 @@ static int inval_status(obos_aud_connection* client, aud_packet* pckt, const cha
 obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_packet* pckt)
 {
     obos_aud_connection* ret = calloc(1, sizeof(obos_aud_connection));
+    assert(ret);
     ret->client_id = client_ids++;
     ret->fd = fd;
     ret->stream_handles.lock = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
@@ -99,6 +100,7 @@ obos_aud_connection* obos_aud_process_initial_connection_request(int fd, aud_pac
     size_t nOutputs = g_output_count;
     size_t payload_len = sizeof(aud_initial_connection_reply)+ nOutputs * sizeof(uint16_t);
     aud_initial_connection_reply *payload = calloc(payload_len, 1);
+    assert(payload);
     payload->client_id = ret->client_id;
     for (size_t i = 0; i < nOutputs; i++)
         payload->output_ids[i] = g_outputs[i].info.output_id;
@@ -234,6 +236,7 @@ void obos_aud_process_stream_open(obos_aud_connection* client, aud_packet* pckt)
 
     pthread_mutex_lock(&client->stream_handles.lock);
     obos_aud_stream_handle* hnd = calloc(1, sizeof(obos_aud_stream_handle));
+    assert(hnd);
     hnd->stream_id = client->stream_handles.next_stream_id++;
     hnd->stream_node = node;
     hnd->dev = dev;
@@ -330,7 +333,7 @@ void obos_aud_process_stream_get_flags(obos_aud_connection* client, aud_packet* 
     resp.client_id = client->client_id;
     resp.payload = &reply;
     resp.payload_len = sizeof(reply);
-    resp.transmission_id = pckt ? pckt->transmission_id : 0;
+    resp.transmission_id = pckt->transmission_id;
     resp.transmission_id_valid = !!pckt;
     autrans_transmit(client->fd, &resp);
 }
@@ -505,6 +508,7 @@ void obos_aud_process_query_connections(obos_aud_connection* client, aud_packet*
         curr = curr->next;
     }
     aud_query_connections_reply* reply = malloc(len);
+    assert(reply);
     memset(reply, 0, sizeof(*reply));
     reply->arr_offset = offsetof(aud_query_connections_reply, descs);
     struct aud_connection_desc* curr_desc = reply->descs;

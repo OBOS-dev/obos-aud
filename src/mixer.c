@@ -176,6 +176,7 @@ aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev, int sampl
     if (!dev)
         return NULL;
     aud_stream_node* node = calloc(1, sizeof(*node));
+    assert(node);
     pthread_mutex_lock(&dev->streams.lock);
     aud_stream_initialize(&node->data, sample_rate, dev->sample_rate, channels);
     node->data.dev = dev;
@@ -275,11 +276,14 @@ static void* mixer_worker(void* arg)
     size_t buffer_len = buffer_samples * dev->channels * sizeof(uint16_t);
 
     uint16_t* buffer = malloc(buffer_len);
+    assert(buffer);
     memset(buffer, 0x00, buffer_len);
 
     float* condensed_samples = calloc(dev->channels, sizeof(float));
+    assert(condensed_samples);
     int input_channels = dev->input_channels;
     float *samples = calloc(input_channels, sizeof(float));
+    assert(samples);
 
     while (1)
     {
@@ -288,6 +292,7 @@ static void* mixer_worker(void* arg)
             buffer_samples = dev->buffer_samples;
             buffer_len = buffer_samples * dev->channels * sizeof(uint16_t);
             buffer = realloc(buffer, buffer_len);
+            assert(buffer);
         }
 
         pthread_mutex_lock(&dev->streams.lock);
@@ -303,6 +308,7 @@ static void* mixer_worker(void* arg)
                 buffer_len = buffer_samples * dev->channels * sizeof(uint16_t);
             }
             buffer = malloc(buffer_len);
+            assert(buffer);
             memset(buffer, 0x00, buffer_len);
         }
         pthread_mutex_unlock(&dev->streams.lock);
@@ -320,6 +326,7 @@ static void* mixer_worker(void* arg)
                 if (samples)
                     free(samples);
                 samples = calloc(input_channels, sizeof(float));
+                assert(samples);
             }
             else
                 memset(samples, 0, sizeof(*samples)*input_channels);

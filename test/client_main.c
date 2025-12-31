@@ -263,6 +263,8 @@ int main(int argc, char** argv)
 
     size_t buffer_size = stream_info.target_sample_rate * stream_info.input_channels * (sample_size) * 10;
     aud_data_payload *payload = malloc(buffer_size+sizeof(aud_data_payload));
+    if (!payload)
+        abort();
     payload->stream_id = stream;
     size_t avail = 0;
     while ((avail = read(input, payload->data, buffer_size)) > 0)
