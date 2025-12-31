@@ -179,11 +179,16 @@ int autrans_set_name(int fd, uint32_t client_id, const char* name)
     if (!name)
         return -1;
 
+    size_t payload_len = strlen(name)+1;
+    aud_set_name_payload *payload = malloc(payload_len);
+    payload->resv = 0;
+    memcpy(payload->name, name, payload_len-1);
+
     aud_packet pckt = {};
     pckt.client_id = client_id;
     pckt.opcode = OBOS_AUD_SET_NAME;
-    pckt.payload_len = strlen(name);
-    pckt.cpayload = name;
+    pckt.payload_len = payload_len;
+    pckt.cpayload = payload;
     pckt.transmission_id_valid = false;
     int res = autrans_transmit(fd, &pckt);
     if (res < 0)
