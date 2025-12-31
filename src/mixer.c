@@ -297,6 +297,11 @@ static void* mixer_worker(void* arg)
             aud_backend_output_play(dev->info.output_id, false);
             free(buffer);
             pthread_cond_wait(&dev->streams.evnt, &dev->streams.lock);
+            if (buffer_samples != dev->buffer_samples)
+            {
+                buffer_samples = dev->buffer_samples;
+                buffer_len = buffer_samples * dev->channels * sizeof(uint16_t);
+            }
             buffer = malloc(buffer_len);
             memset(buffer, 0x00, buffer_len);
         }
