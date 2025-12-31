@@ -451,7 +451,8 @@ int main(int argc, char** argv)
                             free(curr);
                             free((void*)data);
                         }
-                        --stream->refs;
+                        if (!(--stream->refs) && stream->should_free)
+                            free(stream);
                     }
                     else
                     {
