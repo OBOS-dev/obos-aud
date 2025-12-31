@@ -172,8 +172,9 @@ typedef struct aud_stream_get_flags_payload {
 } PACK aud_stream_get_flags_payload;
 
 typedef struct aud_set_name_payload {
+    uint8_t resv;
     char name[];
-} aud_set_name_payload;
+} PACK aud_set_name_payload;
 
 typedef struct aud_set_output_buffer_samples_payload {
     uint16_t output_id;
