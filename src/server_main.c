@@ -501,6 +501,9 @@ int main(int argc, char** argv)
                 case OBOS_AUD_QUERY_OUTPUT_PARAMETERS:
                     obos_aud_process_output_device_query_parameters(con, &curr->pckt);
                     break;
+                case OBOS_AUD_SET_DEFAULT_OUTPUT:
+                    obos_aud_process_set_default_output(con, &curr->pckt);
+                    break;
 
                 case OBOS_AUD_STATUS_REPLY_OK:
                 case OBOS_AUD_STATUS_REPLY_UNSUPPORTED:

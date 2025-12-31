@@ -64,7 +64,7 @@ aud_stream_node* mixer_output_add_stream_dev(mixer_output_device* dev, int sampl
 void mixer_output_remove_stream_dev(mixer_output_device* dev, aud_stream_node* stream);
 void mixer_output_remove_stream_dev_unlocked(mixer_output_device* dev, aud_stream_node* stream);
 
-void mixer_output_set_default(int output_id);
+void mixer_output_set_default(mixer_output_device* dev);
 
 void mixer_output_set_volume(mixer_output_device* dev, float volume);
 float mixer_output_get_volume(mixer_output_device* dev);

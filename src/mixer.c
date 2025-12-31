@@ -231,9 +231,8 @@ void mixer_output_remove_stream(int output_id, aud_stream_node* stream)
     mixer_output_remove_stream_dev(mixer_output_from_id(output_id), stream);
 }
 
-void mixer_output_set_default(int output_id)
+void mixer_output_set_default(mixer_output_device* dev)
 {
-    mixer_output_device* dev = mixer_output_from_id(output_id);
     if (!dev)
         return;
     dev->info.flags |= OBOS_AUD_OUTPUT_FLAGS_DEFAULT;
