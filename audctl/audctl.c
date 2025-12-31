@@ -78,6 +78,7 @@ static int query_output(int socket, uint32_t client_id, uint16_t output, aud_out
         free(reply.payload);
         return -1;
     } while(0);
+    return 0;
 }
 
 int main(int argc, char** argv)
@@ -138,6 +139,11 @@ int main(int argc, char** argv)
     const char* command = argv[optind];
     const char* const* command_argv = (optind+1) < argc ? (const char**)&argv[optind+1] : NULL;
     size_t command_argc = argc - (optind+1);
+    if (command_argc)
+        assert(command_argv);
+    for (size_t i = 0; i < command_argc; i++)
+        assert(command_argv[i] != NULL);
+    assert(command != NULL);
 
     if (strcasecmp(command, "output-set-volume") == 0)
     {
