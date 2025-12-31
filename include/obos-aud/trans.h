@@ -150,17 +150,13 @@ typedef union aud_get_volume_payload {
     uint32_t obj_id32;
 } PACK aud_get_volume_payload;
 
-typedef struct aud_set_default_output_payload {
-    uint32_t output_id;
-} aud_set_default_output_payload;
-
 typedef struct aud_close_stream_payload {
     uint16_t stream_id;
 } PACK aud_close_stream_payload;
 
 typedef struct aud_query_output_device_payload {
     uint16_t output_id;
-} PACK aud_query_output_device_payload, aud_query_output_parameters_payload;
+} PACK aud_query_output_device_payload, aud_query_output_parameters_payload, aud_set_default_output_payload;
 
 typedef struct aud_data_payload {
     uint16_t stream_id;
