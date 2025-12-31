@@ -334,8 +334,10 @@ static void* mixer_worker(void* arg)
                 float volume = stream->volume * node->owner->volume * dev->volume;
                 if (!(stream->ptr - stream->in_ptr))
                 {
-                    for (int i = 0; i < stream->channels; i++)
-                        samples[j++] = normalize(0, -0x10000, 0x10000);
+                    // __Do not__ increment j!
+                    memset(&samples[j], 0, stream->channels*sizeof(*samples));
+                    // for (int i = 0; i < stream->channels; i++)
+                    //     samples[j++] = normalize(0, -0x10000, 0x10000);
                     aud_stream_unlock(stream);
                     continue;
                 }
@@ -345,7 +347,11 @@ static void* mixer_worker(void* arg)
                     (node->input_samples_arr = calloc(stream->channels, sizeof(int16_t)));
                 aud_stream_read(stream, i_samples, stream->channels*sizeof(int16_t), false, false);
                 for (int i = 0; i < stream->channels; i++)
-                    samples[j++] = normalize(i_samples[i], -0x10000, 0x10000) * volume;
+                {
+                    float res = normalize(i_samples[i], -0x10000, 0x10000) * volume;
+                    if (res)
+                        samples[j++] = res;
+                }
                 if (node->dead && !stream->ptr)
                 {
                     aud_stream_node* next = node->next;
@@ -354,13 +360,13 @@ static void* mixer_worker(void* arg)
                     goto up;
                 }
             }
-            if (input_channels <= dev->channels)
-                for (int c = 0; c < dev->channels && input_channels != 0; c++)
-                    buffer[i*dev->channels+c] = (int16_t)unnormalize(samples[c % input_channels], -0x10000, 0x10000);
+            if (j <= dev->channels)
+                for (int c = 0; c < dev->channels && j != 0; c++)
+                    buffer[i*dev->channels+c] = (int16_t)unnormalize(samples[c % j], -0x10000, 0x10000);
             else
             {
-                int samples_per_channel = input_channels / dev->channels;
-                int extra_samples = input_channels % dev->channels;
+                int samples_per_channel = j / dev->channels;
+                int extra_samples = j % dev->channels;
                 int additional_samples_per_channel = extra_samples / dev->channels;
                 if (!additional_samples_per_channel)
                     additional_samples_per_channel = 1;
